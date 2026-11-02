@@ -857,6 +857,14 @@ body.chat-open .fab{display:none}
 .wday header .dsum b{text-transform:none;font-size:inherit}
 @media (max-width:620px){.disp-grid td.dd>span.dsummob{white-space:normal!important;font-size:10px!important;font-weight:600}}
 @media (max-width:620px){.disp-grid td.dd>span.dsummob{overflow:visible!important;text-overflow:clip!important;font-size:9.5px!important;letter-spacing:-.2px;padding:1px 0!important}}
+
+.ch-tools{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 16px 8px}
+.ch-tools .ch-f{margin:0}
+.chclr{font-size:13px;color:var(--danger)}
+.chclrbox{margin:0 16px 10px;padding:10px 12px;border:1px solid var(--danger);border-radius:8px;background:color-mix(in srgb,var(--danger) 6%,var(--surface));font-size:13px;display:grid;gap:8px}
+.chclrbox .pact{margin:0;flex-wrap:wrap}
+.btn.danger-btn{background:var(--danger);border-color:var(--danger);color:#fff}
+@media (max-width:420px){.ch-tools{flex-wrap:wrap}.ch-f button{padding:4px 7px;font-size:12px}}
 </style>
 </head>
 <body>
@@ -1482,6 +1490,13 @@ function go(h){if(V&&V.fs){V.fs=false;document.body.classList.remove('noscroll')
 function route(){const h=(S.route||'#/').replace(/^#\/?/,'');const m=h.match(/^a\/(.+)$/);if(m)return{view:'act',id:decodeURIComponent(m[1])};const c=h.match(/^kalendarz(?:\/(\d{4}-\d{1,2}))?$/);if(c)return{view:'cal',ym:c[1]};if(h==='claude')return{view:'list'};const dw=h.match(/^dyspozycja\/t\/(\d{4}-\d{2}-\d{2})$/);if(dw)return{view:'disp',week:dw[1]};const dp=h.match(/^dyspozycja(?:\/(\d{4}-\d{1,2}))?$/);if(dp)return{view:'disp',ym:dp[1]};return{view:'list'};}
 
 function render(){
+  // ten sam widok przerysowany po zapisie/synchronizacji – zostań w tym samym miejscu strony
+  const keepY=S._rRoute===S.route&&S.ready?window.scrollY:null;
+  renderInner();
+  S._rRoute=S.route;
+  if(keepY!=null&&keepY>0){window.scrollTo(0,keepY);requestAnimationFrame(()=>window.scrollTo(0,keepY));}
+}
+function renderInner(){
   S.redraw=null;
   renderTop();
   const main=$('#main');
@@ -2290,8 +2305,11 @@ function approveBadge(p,small){if(!byAthlete(p))return'';return p.approve?`<span
 function approveNote(p){return byAthlete(p)&&p.approve&&p.approve.note?`<div class="apnote"><b>Uwagi trenera:</b> ${esc(p.approve.note)}</div>`:'';}
 const canEditPlan=(x)=>x.kind==='avail'?isOwner():x.kind==='race'?true:x.author===S.me.role;
 
-function openDay(day){S.openDayKey=day;
-  const d=$('#setdlg');const own=isOwner();
+function openDay(day){
+  const d=$('#setdlg');
+  // ponowne otwarcie tego samego dnia (po zapisie) – zachowaj przewinięcie okna
+  const keepTop=d.open&&S.openDayKey===day?(d.querySelector('.dlg-b')?.scrollTop||0):0;
+  S.openDayKey=day;const own=isOwner();
   const av=planOf('avail',day),pl=planOf('plan',day),races=planOf('race',day),acts=actsOn(day);
   const free=availMin(day);
   const sportOpts=Object.entries(PLAN_SPORTS).map(([k,[l]])=>`<option value="${k}">${l}</option>`).join('');
@@ -2323,6 +2341,7 @@ function openDay(day){S.openDayKey=day;
     ${acts.length?`<section><h3>Wykonane</h3><ul class="items">${acts.map(a=>`<li><a href="#/a/${encodeURIComponent(a.id)}" onclick="this.closest('dialog').close()">${esc(a.name)}</a> <span class="muted">${a.s.d>50?km(a.s.d,1)+' km, ':''}${dur(a.s.mt||a.s.et,true)}</span></li>`).join('')}</ul></section>`:''}
   </div>`;
   if(!d.open)d.showModal();
+  if(keepTop){const b=d.querySelector('.dlg-b');if(b){b.scrollTop=keepTop;requestAnimationFrame(()=>b.scrollTop=keepTop);}}
   const refresh=()=>{render();openDay(day);};
   const guard=async(fn,btn)=>{if(btn)btn.disabled=true;try{await fn();refresh();}catch(e){toast(e.message,6000);if(btn)btn.disabled=false;}};
   d.querySelectorAll('.zb2').forEach(b=>b.onclick=()=>b.classList.toggle('on'));
@@ -2624,11 +2643,20 @@ function renderChat(keepInput){
     if(m.type==='event')return sep+`<div class="cev ${m.role}">${icon(m.role==='coach'?'done':'free',14)}<div><b>${who(m.role)}</b> ${esc(m.text)}<time>${tm}</time></div></div>`;
     return sep+`<div class="cmsg ${m.role===S.me.role?'me':'them'} ${m.role}"><div class="cb">${esc(m.text)}</div><time>${m.role===S.me.role?'':who(m.role)+', '}${tm}</time></div>`;}).join('');
   d.innerHTML=`<div class="ch-h"><div><h2>Wiadomości</h2><span class="muted">${S.me.role==='coach'?'z zawodnikiem':'z trenerem'} i zmiany w planie</span></div><button class="icon-btn" onclick="closeChat()" aria-label="Zamknij">✕</button></div>
-    <div class="ch-f seg">${[['all','Wszystko'],['msg','Wiadomości'],['event','Zmiany w planie']].map(([k,l])=>`<button data-cf="${k}" aria-pressed="${f===k}">${l}</button>`).join('')}</div>
+    <div class="ch-tools"><div class="ch-f seg">${[['all','Wszystko'],['msg','Wiadomości'],['event','Zmiany w planie']].map(([k,l])=>`<button data-cf="${k}" aria-pressed="${f===k}">${l}</button>`).join('')}</div>
+      ${(S.chat||[]).length?`<button class="btn ghost chclr" id="chClr" aria-haspopup="true">Wyczyść</button>`:''}</div>
+    <div class="chclrbox" id="chClrBox" hidden><span>Wyczyścić komunikaty w <b>Twoim</b> widoku? ${S.me.role==='coach'?'Zawodnik':'Trener'} nadal będzie je widział.</span>
+      <div class="pact"><button class="btn" data-clr="events">Tylko zmiany w planie</button><button class="btn danger-btn" data-clr="all">Wszystkie komunikaty</button><button class="btn ghost" id="chClrNo">Anuluj</button></div></div>
     <div class="ch-list" id="chList">${rows||`<p class="muted ch-empty">${f==='event'?'Brak zmian w planie.':'Brak wiadomości. Napisz pierwszą.'}</p>`}</div>
     <div class="ch-in"><textarea id="chatTxt" rows="2" maxlength="2000" placeholder="Napisz wiadomość…"></textarea><button class="btn primary" id="chatSend" aria-label="Wyślij">Wyślij</button></div>`;
   const ta=$('#chatTxt');ta.value=prev;
   d.querySelectorAll('[data-cf]').forEach(b=>b.onclick=()=>{S.chatFilter=b.dataset.cf;renderChat(true);});
+  const cl=$('#chClr');if(cl)cl.onclick=()=>{$('#chClrBox').hidden=false;cl.hidden=true;};
+  const cn=$('#chClrNo');if(cn)cn.onclick=()=>{$('#chClrBox').hidden=true;const c=$('#chClr');if(c)c.hidden=false;};
+  d.querySelectorAll('[data-clr]').forEach(b=>b.onclick=async()=>{const what=b.dataset.clr;const old=S.chat;const now=Date.now();
+    S.chat=(S.chat||[]).filter(m=>what==='events'?m.type!=='event':false);S.chatSeen=now;renderChat(true);updateChatBadge();
+    toast(what==='events'?'Wyczyszczono zmiany w planie.':'Wyczyszczono komunikaty.');
+    if(!S.local){try{const r=await api('chatClear',{what});S.chat=r.chat;renderChat(true);}catch(e){S.chat=old;renderChat(true);toast('Nie wyczyszczono: '+e.message);}}});
   const send=async()=>{const t=ta.value.trim();if(!t)return;const b=$('#chatSend');b.disabled=true;
     try{const m=S.local?{id:'m'+Date.now(),role:S.me.role,type:'msg',text:t,ts:Date.now()}:await api('chatSend',{text:t});S.chat=(S.chat||[]).concat([m]);ta.value='';S.chatFilter=S.chatFilter==='event'?'all':S.chatFilter;renderChat();}
     catch(e){toast('Nie wysłano: '+e.message);b.disabled=false;}};
