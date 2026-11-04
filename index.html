@@ -904,6 +904,21 @@ body.chat-open .fab{display:none}
 .logsec details summary{cursor:pointer;color:var(--ok);font-weight:600;font-size:14px;margin-bottom:8px}
 .logsec details{display:grid;gap:8px}
 .logsec details[open]>*{margin-bottom:8px}
+
+/* duże przyciski rozwijające w oknie dnia */
+.bigtoggle{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:10px 14px;border-radius:10px;border:2px solid var(--tc);background:color-mix(in srgb,var(--tc) 10%,var(--surface));color:var(--ink);font:inherit;font-weight:700;font-size:15px;cursor:pointer;text-align:left}
+.bigtoggle:hover{background:color-mix(in srgb,var(--tc) 18%,var(--surface))}
+.bigtoggle .ic{color:var(--tc);flex:none}
+.bigtoggle span{display:grid;gap:1px;flex:1}
+.bigtoggle small{font-weight:400;font-size:12px;color:var(--muted)}
+.bigtoggle .chev{font-style:normal;color:var(--tc);transition:transform .15s}
+.bigtoggle[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.bigtoggle[aria-expanded="true"]{border-bottom-left-radius:0;border-bottom-right-radius:0}
+.log-t{--tc:var(--ok)}.race-t{--tc:var(--hr)}
+.togbox{display:grid;gap:8px;padding:12px;border:2px solid var(--line);border-top:0;border-radius:0 0 10px 10px;margin-top:-8px}
+.logsec .togbox{border-color:var(--ok)}
+#raceBox{border-color:var(--hr)}
+@media (prefers-reduced-motion:reduce){.bigtoggle .chev{transition:none}}
 </style>
 </head>
 <body>
@@ -2401,12 +2416,13 @@ function openDay(day){
       <div class="frow end"><button class="btn primary" id="plAdd">Dodaj trening</button></div>
     </section>
     ${own?logFormHtml(day):''}
-    <section><h3><span style="color:var(--hr)">${icon('race',18)}</span>Start w zawodach</h3>
+    <section>${races.length?`<h3><span style="color:var(--hr)">${icon('race',18)}</span>Start w zawodach</h3>`:''}
       ${races.length?`<ul class="items">${races.map(r=>`<li><span class="prio" style="background:${PRIO[r.prio][2]}">${r.prio}</span> <b>${esc(r.name)}</b> <span class="muted">${PRIO[r.prio][1]}</span><br>${RACE_DISC[r.disc]}${r.dist?', '+esc(r.dist):''}${r.goal?`, przewidywany czas <b>${esc(r.goal)}</b>`:''}<span class="muted">, ${daysTxt(Math.max(0,daysTo(day)))}</span>${r.note?`<p class="pdesc">${esc(r.note)}</p>`:''}<button class="del" data-del="${r.id}">Usuń</button></li>`).join('')}</ul>`:''}
-      <details ${races.length?'':'open'}><summary>${races.length?'Dodaj kolejny start':'Dodaj start'}</summary>
+      <button type="button" class="bigtoggle race-t" data-tog="raceBox" aria-expanded="false">${icon('race',20)}<span>${races.length?'Dodaj kolejny start w zawodach':'Dodaj start w zawodach'}</span><i class="chev">▾</i></button>
+      <div class="togbox" id="raceBox" hidden>
         <div class="frow"><label class="grow">Nazwa zawodów<input id="raName" maxlength="100" placeholder="np. Półmaraton Łódź"></label><label>Priorytet<select id="raPrio"><option value="A">A – ważny</option><option value="B">B – mniej ważny</option><option value="C" selected>C – treningowy</option></select></label></div>
         <div class="frow"><label>Dyscyplina<select id="raDisc">${Object.entries(RACE_DISC).map(([k,l])=>`<option value="${k}">${l}</option>`).join('')}</select></label><label>Dystans<input id="raDist" maxlength="40" placeholder="np. 21,1 km"></label><label>Przewidywany czas<input id="raGoal" maxlength="8" placeholder="g:mm:ss"></label></div>
-        <div class="frow end"><button class="btn primary" id="raAdd">Dodaj start</button></div></details>
+        <div class="frow end"><button class="btn primary" id="raAdd">Zapisz start</button></div></div>
     </section>
     ${acts.length?`<section><h3>Wykonane</h3><ul class="items">${acts.map(a=>`<li><a href="#/a/${encodeURIComponent(a.id)}" onclick="this.closest('dialog').close()">${esc(a.name)}</a> <span class="muted">${a.s.d>50?km(a.s.d,1)+' km, ':''}${dur(a.s.mt||a.s.et,true)}</span></li>`).join('')}</ul></section>`:''}
   </div>`;
@@ -2421,6 +2437,8 @@ function openDay(day){
   d.querySelectorAll('[data-apedit]').forEach(b=>b.onclick=()=>{const id=b.dataset.apedit;d.querySelector('#ap-'+id).hidden=false;b.parentElement.hidden=true;});
   d.querySelectorAll('[data-apundo]').forEach(b=>b.onclick=()=>guard(async()=>{const id=b.dataset.apundo;if(!S.local)await api('planApprove',{id,approve:false});const x=S.plan.find(x=>x.id===id);if(x)delete x.approve;toast('Cofnięto akceptację.');},b));
   bindStatus(d,guard);bindPlanEdit(d,refresh);bindLogForm(d,day,refresh);
+  d.querySelectorAll('.bigtoggle').forEach(b=>b.onclick=()=>{const box=d.querySelector('#'+b.dataset.tog);const open=box.hidden;box.hidden=!open;b.setAttribute('aria-expanded',open);
+    if(open){const f=box.querySelector('input,textarea');setTimeout(()=>box.scrollIntoView({block:'nearest',behavior:'smooth'}),30);}});
   d.querySelectorAll('[data-skipask]').forEach(b=>b.onclick=()=>{const id=b.dataset.skipask;d.querySelector('#skip-'+id).hidden=false;const a=d.querySelector('#ask-'+id);if(a)a.hidden=true;b.parentElement.hidden=true;});
   d.querySelectorAll('[data-skipc]').forEach(b=>b.onclick=()=>refresh());
   d.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>guard(async()=>{const id=b.dataset.skip;const reason=(d.querySelector(`input[name="sr-${id}"]:checked`)||{}).value||'inna';const note=d.querySelector('#skn-'+id).value.trim().slice(0,200);
@@ -2745,13 +2763,14 @@ function openImport(){
 const planReal=k=>planOf('plan',k).filter(p=>!p.logged); // plan bez treningów dopisanych ręcznie
 const isNoAvail=k=>planOf('avail',k).some(x=>x.none);
 function logFormHtml(day){
-  return `<section class="logsec"><h3><span style="color:var(--ok)">${icon('done',18)}</span>Dodaj wykonany trening <span class="muted">(bez zegarka)</span></h3>
-    <details id="logBox"><summary>Np. spacer, sauna, siłownia bez zegarka</summary>
+  return `<section class="logsec">
+    <button type="button" class="bigtoggle log-t" data-tog="logBox" aria-expanded="false">${icon('done',20)}<span>Dodaj wykonany trening<small>np. spacer, sauna, siłownia bez zegarka</small></span><i class="chev">▾</i></button>
+    <div class="togbox" id="logBox" hidden>
       <div class="chsp" data-for="log">${Object.entries(PLAN_SPORTS).map(([k,[l,c]])=>`<button type="button" class="chs lgs${k==='walk'?' on':''}" data-sp="${k}" style="--c:${c}">${icon(k,18)}<span>${l}</span></button>`).join('')}</div>
       <div class="frow"><label>Czas (min)<input id="logDur" inputmode="numeric" placeholder="np. 45"></label><label>Dystans (km, opcjonalnie)<input id="logDist" inputmode="decimal" placeholder="np. 4,5"></label></div>
       <span class="effq">Odczucie <span class="muted">(opcjonalnie, 1 – lekki, 5 – zmęczony)</span></span>${effortSelect('log')}
       <label class="skipn">Opis / uwagi (opcjonalnie)<textarea id="logNote" rows="2" maxlength="500" placeholder="np. spacer z psem po lesie"></textarea></label>
-      <div class="pact"><button class="btn primary" id="logSave">${icon('done',18)} Zapisz trening</button></div></details></section>`;
+      <div class="pact"><button class="btn primary" id="logSave">${icon('done',18)} Zapisz trening</button></div></div></section>`;
 }
 function bindLogForm(d,day,refresh){
   const b=d.querySelector('#logSave');if(!b)return;
