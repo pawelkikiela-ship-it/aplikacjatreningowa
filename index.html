@@ -589,7 +589,6 @@ body.noscroll .fab{display:none}
   .disp-grid .nm{display:none}
   .disp-grid td.dd>span:not(.dn){gap:2px;justify-content:flex-start}
   .disp-grid .ic{width:11px;height:11px}
-  .cal-a .ic{display:none}
 }
 @media (max-width:620px){.disp-grid .pl .ok{display:none}}
 
@@ -865,6 +864,10 @@ body.chat-open .fab{display:none}
 .chclrbox .pact{margin:0;flex-wrap:wrap}
 .btn.danger-btn{background:var(--danger);border-color:var(--danger);color:#fff}
 @media (max-width:420px){.ch-tools{flex-wrap:wrap}.ch-f button{padding:4px 7px;font-size:12px}}
+
+/* zakładka Kalendarz: ikony treningów także na telefonie */
+@media (max-width:620px){.cal-a{display:flex!important;align-items:center;gap:2px;padding:2px!important}.cal-a .ic{display:inline-block!important;width:11px;height:11px;margin:0!important;flex:none}}
+.restsec{margin-top:0}
 </style>
 </head>
 <body>
@@ -1314,12 +1317,20 @@ function readZoneEditor(d){
 const HAS_GAS=!!(window.google&&google.script&&google.script.run);
 const API_URL=(window.__API_URL__&&/^https:\/\/script\.google\.com\//.test(window.__API_URL__))?window.__API_URL__:null; // wersja z GitHub Pages
 const HAS_API=HAS_GAS||!!API_URL;
-async function apiFetch(action,payload){
+// operacje bezpieczne do powtórzenia (nie tworzą duplikatów)
+const RETRY_OK=new Set(['init','sync','streams','chatClear','chatSeen','seen','claudeDocs','fit','updateActivity','planDone','setRest','rate','planApprove','saveSettings']);
+async function apiFetch(action,payload,attempt=0){
   // zwykłe żądanie POST (text/plain – bez zapytania wstępnego CORS) do aplikacji Apps Script
   let r;
-  try{r=await fetch(API_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({k:S.key,action,payload:payload||{}})});}
-  catch(e){throw new Error('Brak połączenia z serwerem');}
-  const t=await r.text();let o;try{o=JSON.parse(t);}catch(e){throw new Error('Błędna odpowiedź serwera');}
+  try{r=await fetch(API_URL,{method:'POST',redirect:'follow',cache:'no-store',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({k:S.key,action,payload:payload||{}})});}
+  catch(e){
+    // Google czasem zwraca chwilowy błąd bez nagłówków CORS – ponów raz po chwili
+    if(attempt<2&&RETRY_OK.has(action)){await new Promise(z=>setTimeout(z,800*(attempt+1)));return apiFetch(action,payload,attempt+1);}
+    throw new Error('Brak połączenia z serwerem (spróbuj ponownie za chwilę)');}
+  const t=await r.text();let o;
+  try{o=JSON.parse(t);}catch(e){
+    if(attempt<2&&RETRY_OK.has(action)){await new Promise(z=>setTimeout(z,800*(attempt+1)));return apiFetch(action,payload,attempt+1);}
+    throw new Error('Błędna odpowiedź serwera'+(r.status&&r.status!==200?' ('+r.status+')':''));}
   if(o.error)throw new Error(o.error);return o.data;
 }
 function api(action,payload){
@@ -1524,8 +1535,8 @@ function commentCounts(){const m={};const seen=S.state?.seen||{};
 function renderList(){
   const main=$('#main');const all=[...S.acts.values()].sort((a,b)=>b.start-a.start);
   if(!all.length){
-    main.innerHTML=`<div class="wrap home">${restPanel()}${aiPanel()}<div class="empty dropzone">${isOwner()?`<h2>Wgraj pierwsze treningi</h2><p>Przeciągnij tutaj pliki .fit z zegarka lub licznika (możesz kilka naraz) albo wybierz je z dysku. Dane z obu urządzeń zostaną przeliczone tą samą metodą.</p><button class="btn primary" onclick="pickFiles()">Wybierz pliki .fit</button>`:`<h2>Brak aktywności</h2><p>Zawodnik nie wgrał jeszcze żadnych treningów. Gdy to zrobi, pojawią się tutaj automatycznie.</p>`}</div></div>`;
-    bindRestPanel();bindAiPanel();
+    main.innerHTML=`<div class="wrap home">${restPanel()}${restChartSection(new Date().getFullYear(),new Date().getMonth()+1,'Tętno spoczynkowe – wykres')}${aiPanel()}<div class="empty dropzone">${isOwner()?`<h2>Wgraj pierwsze treningi</h2><p>Przeciągnij tutaj pliki .fit z zegarka lub licznika (możesz kilka naraz) albo wybierz je z dysku. Dane z obu urządzeń zostaną przeliczone tą samą metodą.</p><button class="btn primary" onclick="pickFiles()">Wybierz pliki .fit</button>`:`<h2>Brak aktywności</h2><p>Zawodnik nie wgrał jeszcze żadnych treningów. Gdy to zrobi, pojawią się tutaj automatycznie.</p>`}</div></div>`;
+    bindRestPanel();bindAiPanel();bindRestChart(main,new Date().getFullYear(),new Date().getMonth()+1);S.redraw=()=>drawRestChart(new Date().getFullYear(),new Date().getMonth()+1);S.redraw();
     return;
   }
   const cc=commentCounts();
@@ -1536,6 +1547,8 @@ function renderList(){
   const sum=(arr,f)=>arr.reduce((x,a)=>x+(f(a)||0),0);
   const seen=S.state?.seen||{},since=S.state?.since||0;
   main.innerHTML=`<div class="wrap home">
+    ${restPanel()}
+    ${restChartSection(new Date().getFullYear(),new Date().getMonth()+1,'Tętno spoczynkowe – wykres')}
     <div class="overview">
       <section class="panel"><h2>Ten tydzień</h2><p class="sub">od ${new Date(wk).toLocaleDateString('pl-PL',{day:'numeric',month:'long'})}</p>
         <div class="week-now">
@@ -1544,7 +1557,6 @@ function renderList(){
           <div><b class="num">${nf(sum(thisW,a=>a.s.gain))}</b><span>m w górę</span></div>
           <div><b class="num">${nf(sum(thisW,a=>loadOf(a)?.v))}</b><span>obciążenie</span></div>
         </div><canvas class="cv" id="wb"></canvas><p class="sub" style="margin:6px 0 0">Czas ruchu w ostatnich 12 tygodniach</p></section>
-      ${restPanel()}
     </div>
     ${aiPanel()}
     <section>
@@ -1563,7 +1575,8 @@ function renderList(){
           ${a.s.hr?`<div><b class="num">${nf(a.s.hr)}</b><span>bpm</span></div>`:''}${L?`<div><b class="num">${nf(L.v)}</b><span>obc.</span></div>`:''}</div></a>${actEffortRow(a)}</li>`;}).join('')}</ul></div>`;}).join('')}
     </section></div>`;
   main.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{S.filter=b.dataset.f;render();});bindRestPanel();bindAiPanel();bindActEffort(main);
-  S.redraw=()=>{drawWeeks(all);};S.redraw();
+  bindRestChart(main,new Date().getFullYear(),new Date().getMonth()+1);
+  S.redraw=()=>{drawWeeks(all);drawRestChart(new Date().getFullYear(),new Date().getMonth()+1);};S.redraw();
 }
 function actEffortRow(a){
   if(S.local&&!isOwner())return'';
@@ -2124,6 +2137,13 @@ function bindRestPanel(){
   const go=async()=>{try{const bpm=parseBpm(inp.value);b.disabled=true;if(await saveRest(ymd(Date.now()),bpm))render();else b.disabled=false;}catch(e){toast(e.message);}};
   b.onclick=go;inp.onkeydown=e=>{if(e.key==='Enter')go();};
 }
+function restMonthVals(y,m){const v=Object.entries(S.rest).filter(([k])=>k.startsWith(`${y}-${String(m).padStart(2,'0')}-`)).map(x=>x[1]);return{v,avg:v.length?v.reduce((a,b)=>a+b,0)/v.length:null};}
+function restChartSection(y,m,title){const {v,avg}=restMonthVals(y,m);
+  return `<section class="sec restsec"><div class="sec-h"><h2><span class="heart">♥</span> ${title||'Tętno spoczynkowe'}</h2>
+    <div class="seg" id="restRange"><button data-rr="month" aria-pressed="${S.restRange!=='all'}">W miesiącu</button><button data-rr="all" aria-pressed="${S.restRange==='all'}">Pełen okres</button></div></div>
+    <p class="sub" style="margin:0 0 6px" id="restStat">${restStatTxt(y,m,v,avg)}</p>
+    <div class="panel" style="padding:12px"><canvas class="cv" id="restcv"></canvas></div></section>`;}
+function bindRestChart(root,y,m){root.querySelectorAll('[data-rr]').forEach(b=>b.onclick=()=>{S.restRange=b.dataset.rr;root.querySelectorAll('[data-rr]').forEach(x=>x.setAttribute('aria-pressed',x===b));const {v,avg}=restMonthVals(y,m);$('#restStat').innerHTML=restStatTxt(y,m,v,avg);drawRestChart(y,m);});}
 function restStatTxt(y,m,mRest,mAvg){
   if(S.restRange==='all'){const v=Object.keys(S.rest).sort();if(!v.length)return 'Brak wpisów.';const vals=v.map(k=>S.rest[k]);const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
     const last7=v.slice(-7).map(k=>S.rest[k]);const a7=last7.reduce((a,b)=>a+b,0)/last7.length;
@@ -2175,7 +2195,7 @@ const ICONS={
   change:'<path d="M4 8h13l-3-3M20 16H7l3 3"/>'
 };
 function icon(k,size=14){return `<svg class="ic" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]||ICONS.other}</svg>`;}
-const catIcon=a=>({run:'run',ride:'ride',swim:'swim',gym:'gym'})[catOf(a)]||'other';
+const catIcon=a=>(a.sport===11||a.sport===17)?'walk':(a.cat==='ride'&&a.indoor)?'trainer':(({run:'run',ride:'ride',swim:'swim',gym:'gym'})[catOf(a)]||'other');
 
 /* ===== Dyspozycja czasowa: wolny czas, plan treningów, starty ===== */
 const PLAN_SPORTS={run:['Bieg','var(--accent)'],ride:['Rower','var(--spd)'],trainer:['Trenażer rowerowy','#0891B2'],swim:['Basen','var(--dyn)'],walk:['Marsz','#8D6E63'],gym:['Siłownia','var(--pw)'],sauna:['Sauna','#D97706'],test:['Test wydolnościowy','#DB2777'],other:['Inne','var(--muted)']};
@@ -2486,7 +2506,7 @@ function statusBlock(p,own){
       <div class="pact"><button class="btn stsave st-done" data-stsave="done" data-id="${p.id}">${icon('done',18)} Zapisz: WYKONANY</button></div></div>
     ${skipForm(p).replace(`id="skip-${p.id}"`,`id="stf-${p.id}-skip"`)}
     <div class="stform st-change" id="stf-${p.id}-change" hidden><span class="effq">Co zrobiłeś zamiast planu?</span>
-      <div class="chsp" data-for="${p.id}">${Object.entries(PLAN_SPORTS).filter(([k])=>k!=='sauna').map(([k,[l,c]])=>`<button type="button" class="chs${k===p.sport?' on':''}" data-sp="${k}" style="--c:${c}">${icon(k,18)}<span>${l}</span></button>`).join('')}</div>
+      <div class="chsp" data-for="${p.id}">${Object.entries(PLAN_SPORTS).map(([k,[l,c]])=>`<button type="button" class="chs${k===p.sport?' on':''}" data-sp="${k}" style="--c:${c}">${icon(k,18)}<span>${l}</span></button>`).join('')}</div>
       <label class="skipn">Czas (min)<input id="stdur-${p.id}" inputmode="numeric" value="${p.dur}"></label>
       <label class="skipn">Uwagi (opcjonalnie)<textarea id="stn-${p.id}-change" rows="2" maxlength="500" placeholder="np. skrócone do 4×800 m, deszcz"></textarea></label>
       <span class="effq">Odczucie <span class="muted">(opcjonalnie)</span></span>${effortSelect(p.id+'-change')}
@@ -2656,7 +2676,8 @@ function renderChat(keepInput){
   d.querySelectorAll('[data-clr]').forEach(b=>b.onclick=async()=>{const what=b.dataset.clr;const old=S.chat;const now=Date.now();
     S.chat=(S.chat||[]).filter(m=>what==='events'?m.type!=='event':false);S.chatSeen=now;renderChat(true);updateChatBadge();
     toast(what==='events'?'Wyczyszczono zmiany w planie.':'Wyczyszczono komunikaty.');
-    if(!S.local){try{const r=await api('chatClear',{what});S.chat=r.chat;renderChat(true);}catch(e){S.chat=old;renderChat(true);toast('Nie wyczyszczono: '+e.message);}}});
+    if(!S.local){try{const r=await api('chatClear',{what});S.chat=r.chat;renderChat(true);}
+      catch(e){try{const d=await api('sync');setChat(d.chat,d.chatSeen,false);renderChat(true);}catch(_){S.chat=old;renderChat(true);}toast('Nie wyczyszczono: '+e.message,7000);}}});
   const send=async()=>{const t=ta.value.trim();if(!t)return;const b=$('#chatSend');b.disabled=true;
     try{const m=S.local?{id:'m'+Date.now(),role:S.me.role,type:'msg',text:t,ts:Date.now()}:await api('chatSend',{text:t});S.chat=(S.chat||[]).concat([m]);ta.value='';S.chatFilter=S.chatFilter==='event'?'all':S.chatFilter;renderChat();}
     catch(e){toast('Nie wysłano: '+e.message);b.disabled=false;}};
@@ -2774,10 +2795,7 @@ function renderCalendar(ym){
         <td class="wk">${wa.length?`<b>${dur(sum(wa,a=>a.s.mt),true)}</b><span>${km(sum(wa,a=>a.s.d),1)} km</span><span>${wa.length} ${plural(wa.length,'trening','treningi','treningów')}</span>`:'<span>—</span>'}</td></tr>`;}).join('')}
     </tbody></table></div>
     ${ratingSummary(acts,all.filter(a=>a.start>=new Date(y,m-2,1).getTime()&&a.start<start.getTime()))}
-    <section class="sec"><div class="sec-h"><h2><span class="heart">♥</span> Tętno spoczynkowe</h2>
-      <div class="seg" id="restRange"><button data-rr="month" aria-pressed="${S.restRange!=='all'}">W miesiącu</button><button data-rr="all" aria-pressed="${S.restRange==='all'}">Pełen okres</button></div></div>
-      <p class="sub" style="margin:0 0 6px" id="restStat">${restStatTxt(y,m,mRest,mRestAvg)}</p>
-      <div class="panel" style="padding:12px"><canvas class="cv" id="restcv"></canvas></div></section>
+    ${restChartSection(y,m)}
     ${acts.length?`<section class="sec"><div class="sec-h"><h2>Rodzaje treningów</h2></div><div class="tbl-wrap"><table><thead><tr><th>Rodzaj</th><th>Liczba</th><th>Czas</th><th>Dystans</th><th>Śr. tempo / prędkość</th><th>W górę</th><th>Tętno śr.</th><th>Kalorie</th><th>Obciążenie</th></tr></thead><tbody>
       ${Object.entries(byCat).map(([k,arr])=>{const d=sum(arr,a=>a.s.d),t=sum(arr,a=>a.s.mt);const ht=arr.filter(a=>a.s.hr).reduce((x,a)=>x+a.s.mt,0);const h=ht?arr.filter(a=>a.s.hr).reduce((x,a)=>x+a.s.hr*a.s.mt,0)/ht:null;
         return `<tr><td><span class="dot" style="background:${CATS[k][1]}"></span>${CATS[k][0]}</td><td>${arr.length}</td><td>${dur(t,true)}</td><td>${km(d,1)} km</td><td>${d>50&&t?(k==='run'?pace(d/t)+' /km':nf(d/t*3.6,1)+' km/h'):'–'}</td><td>${nf(sum(arr,a=>a.s.gain))} m</td><td>${h?nf(h)+' bpm':'–'}</td><td>${nf(sum(arr,a=>a.s.cal))}</td><td>${nf(sum(arr,a=>loadOf(a)?.v))}</td></tr>`;}).join('')}
@@ -2792,7 +2810,7 @@ function renderCalendar(ym){
     :`<div class="empty" style="margin-top:20px"><h2>Brak treningów w tym miesiącu</h2><p>Wybierz inny miesiąc strzałkami lub z wykresu powyżej.</p></div>`}
   </div>`;
   main.querySelectorAll('button.rhr').forEach(b=>b.onclick=e=>{e.preventDefault();editRest(b.dataset.day);});
-  main.querySelectorAll('[data-rr]').forEach(b=>b.onclick=()=>{S.restRange=b.dataset.rr;main.querySelectorAll('[data-rr]').forEach(x=>x.setAttribute('aria-pressed',x===b));$('#restStat').innerHTML=restStatTxt(y,m,mRest,mRestAvg);drawRestChart(y,m);});
+  bindRestChart(main,y,m);
   S.redraw=()=>drawRestChart(y,m);S.redraw();
 }
 
