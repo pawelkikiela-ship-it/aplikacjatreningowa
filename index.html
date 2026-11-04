@@ -888,6 +888,22 @@ body.chat-open .fab{display:none}
 .months.allm{display:flex;overflow-x:auto;gap:4px;height:auto;padding:8px 10px;align-items:flex-end}
 .months.allm .mb{flex:0 0 44px;height:86px}
 .months.allm .mb b{font-size:10px;color:var(--muted);font-weight:600}
+
+/* treningi z planu bez pliku */
+.manic{display:inline-flex;vertical-align:-3px;margin-right:4px}
+.badge.zplanu{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.badge.chg2{background:#FFF3D6;color:#8A5A00}
+.act .t .badge.zplanu{color:var(--muted)}.act .t .badge.chg2{color:#8A5A00}
+.cal-a.man{border-left-style:dashed}
+
+/* brak dyspozycji i treningi dodane ręcznie */
+.avo.none{border-color:var(--muted);color:var(--muted)}.avo.none.on{background:var(--muted);color:#fff}
+.disp-grid .av.none{background:var(--surface-2)!important;border-left:3px solid var(--muted)!important;color:var(--muted)}
+.wfree.none{background:var(--surface-2)}.wfree.none .ic{color:var(--muted)}
+.appr.logd{background:var(--ok-soft);color:var(--ok);border:1px solid var(--ok)}
+.logsec details summary{cursor:pointer;color:var(--ok);font-weight:600;font-size:14px;margin-bottom:8px}
+.logsec details{display:grid;gap:8px}
+.logsec details[open]>*{margin-bottom:8px}
 </style>
 </head>
 <body>
@@ -1554,15 +1570,17 @@ function weekStart(ms){const d=new Date(ms);d.setHours(0,0,0,0);d.setDate(d.getD
 function commentCounts(){const m={};const seen=S.state?.seen||{};
   for(const c of S.comments){const x=m[c.activityId]||(m[c.activityId]={n:0,u:0});x.n++;if(c.role!==S.me.role&&c.ts>(seen[c.activityId]||0)&&!S.local)x.u++;}return m;}
 function renderList(){
-  const main=$('#main');const all=[...S.acts.values()].sort((a,b)=>b.start-a.start);
+  const main=$('#main');const acts0=[...S.acts.values()];const all=acts0.concat(manualDone()).sort((a,b)=>b.start-a.start);
   if(!all.length){
     main.innerHTML=`<div class="wrap home">${restPanel(true)}${aiPanel()}<div class="empty dropzone">${isOwner()?`<h2>Wgraj pierwsze treningi</h2><p>Przeciągnij tutaj pliki .fit z zegarka lub licznika (możesz kilka naraz) albo wybierz je z dysku. Dane z obu urządzeń zostaną przeliczone tą samą metodą.</p><button class="btn primary" onclick="pickFiles()">Wybierz pliki .fit</button>`:`<h2>Brak aktywności</h2><p>Zawodnik nie wgrał jeszcze żadnych treningów. Gdy to zrobi, pojawią się tutaj automatycznie.</p>`}</div></div>`;
     bindRestPanel();bindAiPanel();bindRestChart(main,new Date().getFullYear(),new Date().getMonth()+1);S.redraw=()=>drawRestChart(new Date().getFullYear(),new Date().getMonth()+1);S.redraw();
     return;
   }
   const cc=commentCounts();
-  const cats=[['all','Wszystkie'],['run','Bieg'],['ride','Rower'],['gym','Siłownia'],['other','Inne']].filter(([k])=>k==='all'||all.some(a=>(a.cat==='swim'?'other':a.cat)===k));
-  const list=all.filter(a=>S.filter==='all'||(a.cat==='swim'?'other':a.cat)===S.filter);
+  const present=new Set(all.map(kindOf));
+  const cats=[['all','Wszystkie']].concat(KIND_ORDER.filter(k=>present.has(k)).map(k=>[k,CATS[k][0]]));
+  if(S.filter!=='all'&&!present.has(S.filter))S.filter='all';
+  const list=all.filter(a=>S.filter==='all'||kindOf(a)===S.filter);
   const weeks=new Map();for(const a of list){const k=weekStart(a.start);(weeks.get(k)||weeks.set(k,[]).get(k)).push(a);}
   const wk=weekStart(Date.now());const thisW=all.filter(a=>weekStart(a.start)===wk);
   const sum=(arr,f)=>arr.reduce((x,a)=>x+(f(a)||0),0);
@@ -1585,7 +1603,7 @@ function renderList(){
         const end=new Date(k+6*864e5);
         return `<div class="week"><div class="week-h"><h3>${new Date(k).toLocaleDateString('pl-PL',{day:'numeric',month:'short'})} – ${end.toLocaleDateString('pl-PL',{day:'numeric',month:'short',year:'numeric'})}</h3>
         <div class="tot"><span>${km(sum(arr,a=>a.s.d),1)} km</span><span>${dur(sum(arr,a=>a.s.mt),true)}</span><span>${nf(sum(arr,a=>a.s.gain))} m</span><span>obciążenie ${nf(sum(arr,a=>loadOf(a)?.v))}</span></div></div>
-        <ul class="acts">${arr.map(a=>{const c=cc[a.id];const st=S.local?'':analyzedAt(a)?' st-done':' st-todo';const L=loadOf(a);const d=new Date(a.start);
+        <ul class="acts">${arr.map(a=>{if(a.manual)return manualRow(a);const c=cc[a.id];const st=S.local?'':analyzedAt(a)?' st-done':' st-todo';const L=loadOf(a);const d=new Date(a.start);
           return `<li class="actli"><a class="act${st}" href="#/a/${encodeURIComponent(a.id)}">
           <div class="day"><b>${d.getDate()}</b><span>${d.toLocaleDateString('pl-PL',{weekday:'short'})}</span></div>
           <div class="t"><b>${esc(a.name)}${S.local?'':statusBadge(a)+rateBadge(a)}${c?`<span class="badge ${c.u?'new':'cmc'}">${c.u?c.u+' '+plural(c.u,'nowa uwaga','nowe uwagi','nowych uwag'):c.n+' '+plural(c.n,'uwaga','uwagi','uwag')}</span>`:''}</b>
@@ -1595,9 +1613,17 @@ function renderList(){
           ${a.s.hr?`<div><b class="num">${nf(a.s.hr)}</b><span>bpm</span></div>`:''}${L?`<div><b class="num">${nf(L.v)}</b><span>obc.</span></div>`:''}</div></a>${actEffortRow(a)}</li>`;}).join('')}</ul></div>`;}).join('')}
     </section></div>`;
   main.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{S.filter=b.dataset.f;render();});bindRestPanel();bindAiPanel();bindActEffort(main);
+  main.querySelectorAll('[data-manday]').forEach(el=>el.onclick=e=>{e.preventDefault();const d=el.dataset.manday;DISP_MEM.v='week';go('#/dyspozycja/t/'+ymd(mondayOf(new Date(d+'T12:00'))));openDay(d);});
   bindRestChart(main,new Date().getFullYear(),new Date().getMonth()+1);
-  S.redraw=()=>{drawWeeks(all);drawRestChart(new Date().getFullYear(),new Date().getMonth()+1);};S.redraw();
+  S.redraw=()=>{drawWeeks(all.filter(a=>!a.manual).concat(all.filter(a=>a.manual)));drawRestChart(new Date().getFullYear(),new Date().getMonth()+1);};S.redraw();
 }
+function manualRow(a){const d=new Date(a.start);const p=a.p;const ch=p.change;
+  return `<li class="actli man"><a class="act st-done" href="#/dyspozycja" data-manday="${a.day}">
+    <div class="day"><b>${d.getDate()}</b><span>${d.toLocaleDateString('pl-PL',{weekday:'short'})}</span></div>
+    <div class="t"><b><span class="manic" style="color:${CATS[a.kind][1]}">${icon(a.kind,16)}</span>${esc(a.name)}<span class="badge zplanu">${p.logged?'dodany ręcznie':'z planu'}</span>${ch?'<span class="badge chg2">zmiana planu</span>':''}</b>
+      <span class="fd">${dateLong(a.start)}</span><span>${ch?`zamiast: ${esc((PLAN_SPORTS[p.sport]||PLAN_SPORTS.other)[0])} ${mfmt(p.dur)}${ch.note?' – '+esc(ch.note):''}`:p.logged?(p.desc?esc(p.desc):'dodany ręcznie (bez zegarka)'):(p.doneNote?esc(p.doneNote):'oznaczony ręcznie w planie')}</span></div>
+    <div class="m">${p.dist?`<div><b class="num">${nf(p.dist,p.dist<10?2:1)}</b><span>km</span></div>`:''}<div><b class="num">${dur(a.s.mt)}</b><span>czas</span></div></div></a>
+    ${a.effort?`<div class="aeff ro">Odczucie: ${effortChip(a.effort,true)}</div>`:''}</li>`;}
 function actEffortRow(a){
   if(S.local&&!isOwner())return'';
   if(!isOwner())return a.effort?`<div class="aeff ro">Odczucie zawodnika: ${effortChip(a.effort,true)}</div>`:'';
@@ -2218,7 +2244,7 @@ const ICONS={
   change:'<path d="M4 8h13l-3-3M20 16H7l3 3"/>'
 };
 function icon(k,size=14){return `<svg class="ic" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]||ICONS.other}</svg>`;}
-const catIcon=a=>(a.sport===11||a.sport===17)?'walk':(a.cat==='ride'&&a.indoor)?'trainer':(({run:'run',ride:'ride',swim:'swim',gym:'gym'})[catOf(a)]||'other');
+const catIcon=a=>kindOf(a);
 
 /* ===== Dyspozycja czasowa: wolny czas, plan treningów, starty ===== */
 const PLAN_SPORTS={run:['Bieg','var(--accent)'],ride:['Rower','var(--spd)'],trainer:['Trenażer rowerowy','#0891B2'],swim:['Basen','var(--dyn)'],walk:['Marsz','#8D6E63'],gym:['Siłownia','var(--pw)'],sauna:['Sauna','#D97706'],test:['Test wydolnościowy','#DB2777'],other:['Inne','var(--muted)']};
@@ -2294,16 +2320,16 @@ function renderDisp(ym){
   const prev=m===1?`${y-1}-12`:`${y}-${m-1}`,next=m===12?`${y+1}-1`:`${y}-${m+1}`;
   const todayK=ymd(Date.now());
   const monthDays=Array.from({length:nd},(_,i)=>dk(i+1));
-  const freeM=monthDays.reduce((s,k)=>s+availMin(k),0),planM=monthDays.reduce((s,k)=>s+planOf('plan',k).reduce((x,p)=>x+p.dur,0),0);
+  const freeM=monthDays.reduce((s,k)=>s+availMin(k),0),planM=monthDays.reduce((s,k)=>s+planReal(k).reduce((x,p)=>x+p.dur,0),0);
   const doneM=monthDays.reduce((s,k)=>s+actsOn(k).reduce((x,a)=>x+(a.s.mt||a.s.et||0),0),0)/60;
-  const plansM=monthDays.flatMap(k=>planOf('plan',k));const doneCnt=plansM.filter(planDone).length;
+  const plansM=monthDays.flatMap(k=>planReal(k));const doneCnt=plansM.filter(planDone).length;
   const cell=d=>{if(!d)return'<td class="out"></td>';const k=dk(d);
     const races=planOf('race',k),av=planOf('avail',k).sort((a,b)=>a.from<b.from?-1:1),pl=planOf('plan',k),acts=actsOn(k);
     return `<td class="dd${k===todayK?' today':''}${k<todayK?' past':''}" data-day="${k}" tabindex="0" role="button" aria-label="${ymdLabel(k)}">
       <span class="dn">${d}</span>
       ${pl.length||av.length?`<span class="dsumm">${pl.length?`${pl.length} tr., ${mfmt(pl.reduce((x,p)=>x+p.dur,0))}`:''}${pl.length&&av.length?' / ':''}${av.length?`wolne ${mfmt(availMin(k))}`:''}</span>`:''}
       ${races.map(r=>`<span class="rbadge" style="--pc:${PRIO[r.prio][2]}" title="Start ${r.prio}: ${esc(r.name)}">${icon('race',12)}<b>${r.prio}</b> <span class="nm">${esc(r.name)}</span></span>`).join('')}
-      ${av.length?`<span class="av" title="Wolny czas">${icon('free',14)}<span class="nm">wolne </span>${(m=>m<60?m+'′':nf(m/60,m%60?1:0)+' h')(availMin(k))}</span>`:''}
+      ${isNoAvail(k)?`<span class="av none" title="Brak dyspozycji">${icon('skip',12)}<span class="nm">brak </span>dysp.</span>`:av.length?`<span class="av" title="Wolny czas">${icon('free',14)}<span class="nm">wolne </span>${(m=>m<60?m+'′':nf(m/60,m%60?1:0)+' h')(availMin(k))}</span>`:''}
       ${pl.map(p=>`<span class="pl ${p.author==='coach'?'bycoach':'byath'}${planDone(p)?' done':''}${p.skip?' skip':''}${p.change?' chg':''}${byAthlete(p)&&!p.approve?' pend':''}" style="--c:${PLAN_SPORTS[p.sport][1]}" title="${PLAN_SPORTS[p.sport][0]} ${p.dur} min${p.zones&&p.zones.length?' ('+zonesTxt(p.zones)+')':''}${planDone(p)?' – wykonany':''}">${icon(p.sport,15)}<span class="nm">${PLAN_SPORTS[p.sport][0]} </span>${p.dur}′${p.zones&&p.zones.length?`<span class="nm zmini"> ${zonesTxt(p.zones)}</span>`:''}${planDone(p)?`<span class="ok">${icon('done',11)}</span>`:''}</span>${p.desc?`<span class="pdx">${esc(p.desc)}</span>`:''}`).join('')}
       ${acts.filter(a=>!pl.some(p=>sameCat(p.sport,a))).map(a=>`<span class="dn-act" title="Wykonany: ${esc(a.name)}">${icon(catIcon(a),12)}${icon('done',10)}<span class="nm"> ${esc(CATS[catOf(a)][0])}</span></span>`).join('')}
     </td>`;};
@@ -2311,9 +2337,9 @@ function renderDisp(ym){
     <div class="cal-h"><h1>Plan <span class="muted wrange">${MONTHS[m-1]} ${y}</span></h1>
       <div class="cal-nav">${viewToggle('month',`${y}-${m}`,ymd(mondayOf(new Date(y,m-1,y===now.getFullYear()&&m===now.getMonth()+1?now.getDate():1))))}<a class="btn" href="#/dyspozycja/${prev}" aria-label="Poprzedni miesiąc">‹</a><a class="btn" href="#/dyspozycja/${now.getFullYear()}-${now.getMonth()+1}">Bieżący</a><a class="btn" href="#/dyspozycja/${next}" aria-label="Następny miesiąc">›</a></div></div>
     <div class="tbl-wrap"><table class="cal-grid disp-grid"><thead><tr>${['Pn','Wt','Śr','Cz','Pt','So','Nd'].map(d=>`<th>${d}</th>`).join('')}<th>Suma</th></tr></thead><tbody>
-      ${weeks.map((w,wi)=>{const ks=w.filter(Boolean).map(dk);const fr=ks.reduce((s,k)=>s+availMin(k),0),pp=ks.reduce((s,k)=>s+planOf('plan',k).reduce((x,p)=>x+p.dur,0),0);
+      ${weeks.map((w,wi)=>{const ks=w.filter(Boolean).map(dk);const fr=ks.reduce((s,k)=>s+availMin(k),0),pp=ks.reduce((s,k)=>s+planReal(k).reduce((x,p)=>x+p.dur,0),0);
         const mon=w[0]?dk(w[0]):null;
-        return `<tr>${w.map(cell).join('')}<td class="wk"><span class="wf">wolne <b>${fr?mfmt(fr):'–'}</b></span><span class="wp">plan <b>${pp?mfmt(pp):'–'}</b>${ks.flatMap(k=>planOf('plan',k)).length?` <i>(${ks.flatMap(k=>planOf('plan',k)).length} tr.)</i>`:''}</span>
+        return `<tr>${w.map(cell).join('')}<td class="wk"><span class="wf">wolne <b>${fr?mfmt(fr):'–'}</b></span><span class="wp">plan <b>${pp?mfmt(pp):'–'}</b>${ks.flatMap(k=>planReal(k)).length?` <i>(${ks.flatMap(k=>planReal(k)).length} tr.)</i>`:''}</span>
           ${isOwner()&&mon&&!fr?`<button class="btn ghost copyw" data-mon="${mon}">↻ jak poprz. tydz.</button>`:''}</td></tr>`;}).join('')}
     </tbody></table></div>
     <div class="legend disp-leg"><span><i class="lsw coachsw"></i><em>plan trenera</em></span><span><i class="lsw athsw"></i><em>plan zawodnika</em></span><span style="color:var(--ok)">${icon('free')}<em>wolny czas</em></span>${Object.entries(PLAN_SPORTS).map(([k,[l,c]])=>`<span style="color:${c}">${icon(k)}<em>${l}</em></span>`).join('')}<span style="color:var(--ok)">${icon('done')}<em>wykonany</em></span><span style="color:var(--hr)">${icon('race')}<em>start</em> <b class="prio" style="background:var(--hr)">A</b><b class="prio" style="background:#F59F00">B</b><b class="prio" style="background:var(--spd)">C</b></span></div>
@@ -2344,7 +2370,7 @@ async function planSave(kind,item){
 async function planDel(id){if(!S.local)await api('planDelete',{id});S.plan=S.plan.filter(x=>x.id!==id);}
 /* akceptacja trenera dla treningów zaplanowanych przez zawodnika */
 const byAthlete=p=>p.author==='athlete';
-function approveBadge(p,small){if(!byAthlete(p))return'';return p.approve?`<span class="appr ok${small?' sm':''}" title="Zaakceptowany przez trenera">${icon('done',small?11:13)} zaakceptowany</span>`:`<span class="appr wait${small?' sm':''}" title="Czeka na akceptację trenera">czeka na akceptację</span>`;}
+function approveBadge(p,small){if(p.logged)return `<span class="appr logd${small?' sm':''}">dodany ręcznie</span>`;if(!byAthlete(p))return'';return p.approve?`<span class="appr ok${small?' sm':''}" title="Zaakceptowany przez trenera">${icon('done',small?11:13)} zaakceptowany</span>`:`<span class="appr wait${small?' sm':''}" title="Czeka na akceptację trenera">czeka na akceptację</span>`;}
 function approveNote(p){return byAthlete(p)&&p.approve&&p.approve.note?`<div class="apnote"><b>Uwagi trenera:</b> ${esc(p.approve.note)}</div>`:'';}
 const canEditPlan=(x)=>x.kind==='avail'?isOwner():x.kind==='race'?true:x.author===S.me.role;
 
@@ -2359,8 +2385,8 @@ function openDay(day){
   d.innerHTML=`<div class="dlg-h"><h2>${ymdLabel(day).replace(/^./,c=>c.toUpperCase())}</h2><button class="icon-btn" onclick="this.closest('dialog').close()" aria-label="Zamknij">✕</button></div>
   <div class="dlg-b day-dlg">
     ${own?`    <section><h3><span style="color:var(--ok)">${icon('free',18)}</span>Wolny czas${free?` <span class="muted">(${mfmt(free)})</span>`:''}</h3>
-      ${av.length?`<ul class="items">${av.map(a=>`<li><b>${mfmt(avDur(a))}</b>${a.from?` <span class="muted">(${a.from}–${a.to})</span>`:''}${a.note?` – ${esc(a.note)}`:''}${own?`<button class="del" data-del="${a.id}">Usuń</button>`:''}</li>`).join('')}</ul>`:`<p class="muted">Ile masz czasu na trening tego dnia?</p>`}
-      <div class="avopts" role="group" aria-label="Wolny czas">${AV_OPTS.map(m=>`<button type="button" class="avo${free===m&&av.length===1?' on':''}" data-m="${m}">${m<60?m+' min':nf(m/60,m%60?1:0)+' h'}</button>`).join('')}</div>
+      ${av.length?`<ul class="items">${av.map(a=>`<li><b>${a.none?'Brak dyspozycji':mfmt(avDur(a))}</b>${a.from?` <span class="muted">(${a.from}–${a.to})</span>`:''}${a.note?` – ${esc(a.note)}`:''}${own?`<button class="del" data-del="${a.id}">Usuń</button>`:''}</li>`).join('')}</ul>`:`<p class="muted">Ile masz czasu na trening tego dnia?</p>`}
+      <div class="avopts" role="group" aria-label="Wolny czas">${AV_OPTS.map(m=>`<button type="button" class="avo${free===m&&av.length===1?' on':''}" data-m="${m}">${m<60?m+' min':nf(m/60,m%60?1:0)+' h'}</button>`).join('')}<button type="button" class="avo none${av.some(x=>x.none)?' on':''}" data-m="0">Brak dyspozycji</button></div>
       <div class="frow"><label class="grow">Notatka (opcjonalnie)<input id="avNote" maxlength="200" placeholder="np. tylko basen" value="${esc(av.length===1?av[0].note||'':'')}"></label></div>
     </section>
 `:''}
@@ -2374,6 +2400,7 @@ function openDay(day){
       <div class="frow"><label class="grow">Opis treningu<textarea id="plDesc" rows="3" maxlength="2000" placeholder="np. 10 min rozgrzewki, 6×800 m w S4, 10 min schłodzenia"></textarea></label></div>
       <div class="frow end"><button class="btn primary" id="plAdd">Dodaj trening</button></div>
     </section>
+    ${own?logFormHtml(day):''}
     <section><h3><span style="color:var(--hr)">${icon('race',18)}</span>Start w zawodach</h3>
       ${races.length?`<ul class="items">${races.map(r=>`<li><span class="prio" style="background:${PRIO[r.prio][2]}">${r.prio}</span> <b>${esc(r.name)}</b> <span class="muted">${PRIO[r.prio][1]}</span><br>${RACE_DISC[r.disc]}${r.dist?', '+esc(r.dist):''}${r.goal?`, przewidywany czas <b>${esc(r.goal)}</b>`:''}<span class="muted">, ${daysTxt(Math.max(0,daysTo(day)))}</span>${r.note?`<p class="pdesc">${esc(r.note)}</p>`:''}<button class="del" data-del="${r.id}">Usuń</button></li>`).join('')}</ul>`:''}
       <details ${races.length?'':'open'}><summary>${races.length?'Dodaj kolejny start':'Dodaj start'}</summary>
@@ -2393,7 +2420,7 @@ function openDay(day){
     if(!S.local)await api('planApprove',{id,approve:true,note});const x=S.plan.find(x=>x.id===id);if(x)x.approve={note,ts:Date.now()};toast('Trening zaakceptowany.');},b));
   d.querySelectorAll('[data-apedit]').forEach(b=>b.onclick=()=>{const id=b.dataset.apedit;d.querySelector('#ap-'+id).hidden=false;b.parentElement.hidden=true;});
   d.querySelectorAll('[data-apundo]').forEach(b=>b.onclick=()=>guard(async()=>{const id=b.dataset.apundo;if(!S.local)await api('planApprove',{id,approve:false});const x=S.plan.find(x=>x.id===id);if(x)delete x.approve;toast('Cofnięto akceptację.');},b));
-  bindStatus(d,guard);bindPlanEdit(d,refresh);
+  bindStatus(d,guard);bindPlanEdit(d,refresh);bindLogForm(d,day,refresh);
   d.querySelectorAll('[data-skipask]').forEach(b=>b.onclick=()=>{const id=b.dataset.skipask;d.querySelector('#skip-'+id).hidden=false;const a=d.querySelector('#ask-'+id);if(a)a.hidden=true;b.parentElement.hidden=true;});
   d.querySelectorAll('[data-skipc]').forEach(b=>b.onclick=()=>refresh());
   d.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>guard(async()=>{const id=b.dataset.skip;const reason=(d.querySelector(`input[name="sr-${id}"]:checked`)||{}).value||'inna';const note=d.querySelector('#skn-'+id).value.trim().slice(0,200);
@@ -2408,7 +2435,7 @@ function openDay(day){
   // wybór czasu zastępuje dotychczasowy wpis z tego dnia
   d.querySelectorAll('.avo').forEach(b=>b.onclick=()=>guard(async()=>{const m=+b.dataset.m;const note=$('#avNote').value;
     const keep=av[0];for(const x of av.slice(1))await planDel(x.id);
-    await planSave('avail',{...(keep?{id:keep.id}:{}),day,dur:m,note});toast(`Wolny czas: ${mfmt(m)}.`);},b));
+    await planSave('avail',{...(keep?{id:keep.id}:{}),day,dur:m,none:m===0,note});toast(m?`Wolny czas: ${mfmt(m)}.`:'Zapisano: brak dyspozycji.');},b));
   const avN=$('#avNote');if(avN&&av.length===1&&av[0].dur!=null)avN.onchange=()=>guard(async()=>{await planSave('avail',{id:av[0].id,day,dur:av[0].dur,note:avN.value});toast('Zapisano notatkę.');});
   $('#plAdd').onclick=()=>guard(async()=>{const dur=Math.round(parseFloat($('#plDur').value));if(!isFinite(dur)||dur<5||dur>720)throw new Error('Czas treningu: od 5 do 720 minut.');
     const zones=[...d.querySelectorAll('#plZones .zb2.on')].map(b=>b.dataset.z);
@@ -2433,7 +2460,7 @@ function renderDispWeek(monKey){
   const keys=days.map(ymd);const todayK=ymd(Date.now());
   const prevK=ymd(new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()-7)),nextK=ymd(new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+7));
   const curK=ymd(mondayOf(Date.now()));
-  const fr=keys.reduce((s,k)=>s+availMin(k),0),pp=keys.flatMap(k=>planOf('plan',k));const ppMin=pp.reduce((s,p)=>s+p.dur,0);const dn=pp.filter(planDone).length;
+  const fr=keys.reduce((s,k)=>s+availMin(k),0),pp=keys.flatMap(k=>planReal(k));const ppMin=pp.reduce((s,p)=>s+p.dur,0);const dn=pp.filter(planDone).length;
   const range=`${days[0].toLocaleDateString('pl-PL',{day:'numeric',month:'short'})} – ${days[6].toLocaleDateString('pl-PL',{day:'numeric',month:'short',year:'numeric'})}`;
   const card=(d,k)=>{
     const av=planOf('avail',k),pl=planOf('plan',k),races=planOf('race',k),acts=actsOn(k),free=availMin(k);
@@ -2443,6 +2470,7 @@ function renderDispWeek(monKey){
       <header><b>${d.toLocaleDateString('pl-PL',{weekday:'long'})}</b><span>${d.toLocaleDateString('pl-PL',{day:'numeric',month:'long'})}</span>
         ${pl.length||free?`<span class="dsum"><b>${pl.length}</b> ${plural(pl.length,'trening','treningi','treningów')}${pl.length?` (${mfmt(pl.reduce((x,p)=>x+p.dur,0))})`:''}, wolne <b>${free?mfmt(free):'–'}</b></span>`:''}</header>
       ${races.map(r=>`<div class="wrace" style="--pc:${PRIO[r.prio][2]}">${icon('race',16)}<div><b><span class="prio" style="background:${PRIO[r.prio][2]}">${r.prio}</span> ${esc(r.name)}</b><span>${RACE_DISC[r.disc]}${r.dist?', '+esc(r.dist):''}${r.goal?`, cel ${esc(r.goal)}`:''}</span></div></div>`).join('')}
+      ${isNoAvail(k)?`<div class="wfree none">${icon('skip',16)}<div><b>Brak dyspozycji</b>${av.filter(a=>a.note).map(a=>`<span>${esc(a.note)}</span>`).join('')}</div></div>`:''}
       ${free?`<div class="wfree">${icon('free',16)}<div><b>Wolny czas: ${(m=>m<60?m+' min':nf(m/60,m%60?1:0)+' h')(free)}</b>${av.filter(a=>a.note).map(a=>`<span>${esc(a.note)}</span>`).join('')}</div></div>`:''}
       ${pl.map(p=>`<div class="wplan ${p.author==='coach'?'bycoach':'byath'}${planDone(p)?' done':''}${p.skip?' skip':''}${p.change?' chg':''}" style="--c:${PLAN_SPORTS[p.sport][1]}">
         <div class="wph">${icon(p.sport,18)}<b>${PLAN_SPORTS[p.sport][0]}</b><span class="wdur">${mfmt(p.dur)}</span>${p.zones&&p.zones.length?`<span class="zchip">${zonesTxt(p.zones)}</span>`:''}${p.ai?'<span class="aitag">Claude</span>':''}</div>
@@ -2713,6 +2741,29 @@ function openImport(){
     catch(err){toast('Import nie powiódł się: '+err.message,8000);b.disabled=false;b.textContent='Importuj teraz';}};
 }
 
+/* ===== Ręczne dodanie wykonanego treningu (bez zegarka) ===== */
+const planReal=k=>planOf('plan',k).filter(p=>!p.logged); // plan bez treningów dopisanych ręcznie
+const isNoAvail=k=>planOf('avail',k).some(x=>x.none);
+function logFormHtml(day){
+  return `<section class="logsec"><h3><span style="color:var(--ok)">${icon('done',18)}</span>Dodaj wykonany trening <span class="muted">(bez zegarka)</span></h3>
+    <details id="logBox"><summary>Np. spacer, sauna, siłownia bez zegarka</summary>
+      <div class="chsp" data-for="log">${Object.entries(PLAN_SPORTS).map(([k,[l,c]])=>`<button type="button" class="chs lgs${k==='walk'?' on':''}" data-sp="${k}" style="--c:${c}">${icon(k,18)}<span>${l}</span></button>`).join('')}</div>
+      <div class="frow"><label>Czas (min)<input id="logDur" inputmode="numeric" placeholder="np. 45"></label><label>Dystans (km, opcjonalnie)<input id="logDist" inputmode="decimal" placeholder="np. 4,5"></label></div>
+      <span class="effq">Odczucie <span class="muted">(opcjonalnie, 1 – lekki, 5 – zmęczony)</span></span>${effortSelect('log')}
+      <label class="skipn">Opis / uwagi (opcjonalnie)<textarea id="logNote" rows="2" maxlength="500" placeholder="np. spacer z psem po lesie"></textarea></label>
+      <div class="pact"><button class="btn primary" id="logSave">${icon('done',18)} Zapisz trening</button></div></details></section>`;
+}
+function bindLogForm(d,day,refresh){
+  const b=d.querySelector('#logSave');if(!b)return;
+  d.querySelectorAll('.lgs').forEach(x=>x.onclick=()=>{d.querySelectorAll('.lgs').forEach(y=>y.classList.toggle('on',y===x));});
+  b.onclick=async()=>{const sp=d.querySelector('.lgs.on');const du=Math.round(parseFloat(d.querySelector('#logDur').value));
+    const ds=parseFloat(String(d.querySelector('#logDist').value).replace(',','.'));const sel=d.querySelector('.effsel[data-for="log"] .effs.on');
+    if(!sp){toast('Wybierz rodzaj treningu.');return;}if(!(du>=5&&du<=720)){toast('Podaj czas od 5 do 720 minut.');return;}
+    if(d.querySelector('#logDist').value.trim()&&!(ds>0&&ds<=500)){toast('Dystans: od 0,1 do 500 km.');return;}
+    const item={day,sport:sp.dataset.sp,dur:du,desc:d.querySelector('#logNote').value,done:true,logged:true,effort:sel?+sel.dataset.v:undefined,dist:ds>0?Math.round(ds*100)/100:undefined};
+    b.disabled=true;try{await planSave('plan',item);toast('Dodano wykonany trening.');refresh();}catch(e){toast(e.message,6000);b.disabled=false;}};
+}
+
 /* ===== Czat zawodnik ↔ trener + powiadomienia o zmianach w planie ===== */
 function chatUnread(){if(S.local||!S.chat)return 0;return S.chat.filter(m=>m.role!==S.me.role&&m.ts>(S.chatSeen||0)).length;}
 function updateChatBadge(){const b=$('#chatBadge');if(!b)return;const n=chatUnread();b.hidden=!n;b.textContent=n>99?'99+':n;const btn=$('#chatBtn');if(btn)btn.hidden=!S.ready||S.local;}
@@ -2804,14 +2855,25 @@ function ratingSummary(acts,prevActs){
 
 /* ===== Kalendarz zbiorczy ===== */
 const MONTHS=['styczeń','luty','marzec','kwiecień','maj','czerwiec','lipiec','sierpień','wrzesień','październik','listopad','grudzień'];
-const CATS={run:['Bieg','var(--accent)'],ride:['Rower','var(--spd)'],swim:['Pływanie','var(--dyn)'],gym:['Siłownia','var(--pw)'],other:['Inne','var(--muted)']};
-const catOf=a=>CATS[a.cat]?a.cat:'other';
+const CATS={run:['Bieg','var(--accent)'],ride:['Rower','var(--spd)'],trainer:['Trenażer rowerowy','#0891B2'],swim:['Pływanie','var(--dyn)'],walk:['Marsz','#8D6E63'],gym:['Siłownia','var(--pw)'],sauna:['Sauna','#D97706'],test:['Test wydolnościowy','#DB2777'],other:['Inne','var(--muted)']};
+const KIND_ORDER=Object.keys(CATS);
+/** Rodzaj treningu jak w planie: bieg, rower, trenażer, basen, marsz, siłownia, sauna, test, inne */
+function kindOf(a){if(a.manual)return CATS[a.kind]?a.kind:'other';if(a.sport===11||a.sport===17)return 'walk';if(a.cat==='ride')return a.indoor?'trainer':'ride';if(a.cat==='run')return 'run';if(a.cat==='swim')return 'swim';if(a.cat==='gym')return 'gym';return 'other';}
+const catOf=a=>kindOf(a);
+/** Treningi wykonane z planu bez pliku z zegarka (np. sauna, test, siłownia bez zegarka) */
+function manualDone(){
+  return (S.plan||[]).filter(p=>p.kind==='plan'&&!p.skip&&(p.done||p.change)).map(p=>{
+    const k=p.change&&p.change.sport?p.change.sport:p.sport;const du=(p.change&&p.change.dur)||p.dur;
+    if(actsOn(p.day).some(a=>sameCat(k,a)))return null; // jest wgrany plik – nie dubluj
+    return {manual:true,id:'plan:'+p.id,p,kind:k,day:p.day,start:new Date(p.day+'T12:00').getTime(),name:(PLAN_SPORTS[k]||PLAN_SPORTS.other)[0],effort:planEffort(p),s:{mt:du*60,et:du*60,d:(p.dist||0)*1000,gain:0,cal:0}};
+  }).filter(Boolean);
+}
 function addHist(acc,h){if(!h)return acc;const o=h.o||0;h.s.forEach((v,i)=>{acc[o+i]=(acc[o+i]||0)+v;});return acc;}
 function renderCalendar(ym){
   const main=$('#main');const now=new Date();
   let [y,m]=(ym||'').split('-').map(Number);if(!y||!m){y=now.getFullYear();m=now.getMonth()+1;}
   const start=new Date(y,m-1,1),end=new Date(y,m,1);
-  const all=[...S.acts.values()];
+  const all=[...S.acts.values()].concat(manualDone());
   const acts=all.filter(a=>a.start>=start.getTime()&&a.start<end.getTime()).sort((a,b)=>a.start-b.start);
   const sum=(arr,f)=>arr.reduce((x,a)=>x+(f(a)||0),0);
   const st=S.settings;
@@ -2851,7 +2913,7 @@ function renderCalendar(ym){
     return isOwner()&&!future(d)?`<button class="rhr add" data-day="${dk(d)}" title="Dodaj tętno spoczynkowe">♥ +</button>`:'';};
   const mRest=Object.entries(S.rest).filter(([k])=>k.startsWith(`${y}-${String(m).padStart(2,'0')}-`)).map(x=>x[1]);
   const mRestAvg=mRest.length?mRest.reduce((a,b)=>a+b,0)/mRest.length:null;
-  const chip=a=>`<a class="cal-a" href="#/a/${encodeURIComponent(a.id)}" style="--c:${CATS[catOf(a)][1]}" title="${esc(a.name)}">${icon(catIcon(a),12)}<b>${esc(CATS[catOf(a)][0])}</b> ${a.s.d>50?km(a.s.d,1)+' km':dur(a.s.mt||a.s.et,true)}</a>`;
+  const chip=a=>`<a class="cal-a${a.manual?' man':''}" href="${a.manual?'#/dyspozycja':'#/a/'+encodeURIComponent(a.id)}"${a.manual?` data-manday="${a.day}"`:''} style="--c:${CATS[catOf(a)][1]}" title="${esc(a.name)}">${icon(catIcon(a),12)}<b>${esc(({trainer:'Trenażer',test:'Test'})[catOf(a)]||CATS[catOf(a)][0])}</b> ${a.s.d>50?km(a.s.d,1)+' km':dur(a.s.mt||a.s.et,true)}</a>`;
   const zoneTable2=(cat,type,times,title)=>times.reduce((x,v)=>x+v,0)?zoneBlockFor(cat,type,times,title):'';
   main.innerHTML=`<div class="wrap home cal">
     <div class="cal-h"><h1>${MONTHS[m-1].charAt(0).toUpperCase()+MONTHS[m-1].slice(1)} ${y}</h1>
@@ -2889,6 +2951,7 @@ function renderCalendar(ym){
     <div class="months allm">${monthsAll.map(x=>`<a href="#/kalendarz/${x.y}-${x.m}" class="mb${x.y===y&&x.m===m?' on':''}" title="${x.n} ${plural(x.n,'trening','treningi','treningów')}, ${nf(x.km,0)} km, ${dur(x.t*3600,true)}"><b>${x.n||''}</b><i style="height:${Math.max(2,x.t/mxAll*54)}px"></i><span>${MONTHS[x.m-1].slice(0,3)}${x.m===1||x===monthsAll[0]?' '+String(x.y).slice(2):''}</span></a>`).join('')}</div></section>
   </div>`;
   main.querySelectorAll('button.rhr').forEach(b=>b.onclick=e=>{e.preventDefault();editRest(b.dataset.day);});
+  main.querySelectorAll('[data-manday]').forEach(el=>el.onclick=e=>{e.preventDefault();e.stopPropagation();const d=el.dataset.manday;DISP_MEM.v='week';go('#/dyspozycja/t/'+ymd(mondayOf(new Date(d+'T12:00'))));openDay(d);});
   S.redraw=null;
 }
 
