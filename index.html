@@ -868,6 +868,26 @@ body.chat-open .fab{display:none}
 /* zakładka Kalendarz: ikony treningów także na telefonie */
 @media (max-width:620px){.cal-a{display:flex!important;align-items:center;gap:2px;padding:2px!important}.cal-a .ic{display:inline-block!important;width:11px;height:11px;margin:0!important;flex:none}}
 .restsec{margin-top:0}
+
+/* uwagi i edycja planu */
+.pnote{font-size:13px;border-radius:4px;padding:6px 8px;margin-top:6px;white-space:pre-wrap;overflow-wrap:anywhere}
+.pnote.athlete{background:var(--surface-2);border-left:3px solid var(--accent)}
+.pnote.coach{background:var(--coach-bg);border-left:3px solid var(--coach-bd)}
+.wplan .pnote{margin-top:2px;font-size:12px}
+.pedbtns{margin-top:6px}.pedbtns .btn{font-size:13px;padding:5px 10px;min-height:34px}
+.pedit{display:grid;gap:8px;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.pedit textarea{border:1px solid var(--line);border-radius:6px;padding:8px 10px;background:var(--surface);color:var(--ink);font:inherit;font-size:15px;width:100%;box-sizing:border-box;resize:vertical}
+/* tętno z wykresem w jednym panelu */
+.restchart{display:grid;gap:6px;border-top:1px solid var(--line);padding-top:10px}
+.rest-cth{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+/* import w nagłówku */
+.impinfo{display:grid;gap:6px}.impinfo p{margin:0;font-size:14px}
+.impst{justify-self:start;font-size:13px;font-weight:600;border-radius:999px;padding:3px 10px}
+.impst.on{background:var(--ok-soft);color:var(--ok)}.impst.off{background:var(--surface-2);color:var(--muted)}
+/* cały okres */
+.months.allm{display:flex;overflow-x:auto;gap:4px;height:auto;padding:8px 10px;align-items:flex-end}
+.months.allm .mb{flex:0 0 44px;height:86px}
+.months.allm .mb b{font-size:10px;color:var(--muted);font-weight:600}
 </style>
 </head>
 <body>
@@ -875,6 +895,7 @@ body.chat-open .fab{display:none}
   <a class="brand" href="#/"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path d="M2 20 L8 12 L12 16 L18 6 L26 18" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="18" cy="6" r="2.6" fill="var(--hr)"/></svg><b>Dziennik treningowy</b></a>
   <nav class="tabs" aria-label="Widoki"><a href="#/" data-v="list">Treningi</a><a href="#/kalendarz" data-v="cal">Kalendarz</a><a href="#/dyspozycja" data-v="disp">Plan</a></nav>
   <div class="who" id="who"></div>
+  <button class="btn ghost impbtn" id="impBtn" hidden onclick="openImport()" aria-label="Import treningów" title="Import treningów (automatyczny z Dysku)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7.5a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10.5v5M9.5 13l2.5 2.5 2.5-2.5"/></svg><span class="lbl">Import</span></button>
   <button class="btn ghost chatbtn" id="chatBtn" hidden onclick="openChat()" aria-label="Wiadomości i zmiany w planie"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"/></svg><span class="lbl">Wiadomości</span><b class="cbadge" id="chatBadge" hidden>0</b></button>
   <button class="btn ghost" onclick="openSettings()" aria-label="Ustawienia"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="lbl">Ustawienia</span></button>
   <button class="btn primary" id="upBtn" hidden onclick="pickFiles()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg><span class="lbl">Wgraj pliki .fit</span></button>
@@ -1524,7 +1545,7 @@ function renderTop(){
   const role=S.local||!S.ready?'':isOwner()?'Zawodnik':'Trener';
   $('#who').innerHTML=role?`<span class="nm"></span><span class="role">${role}</span>`:'';
   const nm=$('#who .nm');if(nm)nm.textContent=S.me.name||'';
-  $('#upBtn').hidden=!isOwner();updateChatBadge();const ct=document.querySelector('.tabs a[data-v="claude"]');if(ct)ct.hidden=S.ready&&!S.local&&!isOwner();
+  $('#upBtn').hidden=!isOwner();updateChatBadge();updateImpBtn();const ct=document.querySelector('.tabs a[data-v="claude"]');if(ct)ct.hidden=S.ready&&!S.local&&!isOwner();
   $('#banner').hidden=!S.local;
 }
 
@@ -1535,7 +1556,7 @@ function commentCounts(){const m={};const seen=S.state?.seen||{};
 function renderList(){
   const main=$('#main');const all=[...S.acts.values()].sort((a,b)=>b.start-a.start);
   if(!all.length){
-    main.innerHTML=`<div class="wrap home">${restPanel()}${restChartSection(new Date().getFullYear(),new Date().getMonth()+1,'Tętno spoczynkowe – wykres')}${aiPanel()}<div class="empty dropzone">${isOwner()?`<h2>Wgraj pierwsze treningi</h2><p>Przeciągnij tutaj pliki .fit z zegarka lub licznika (możesz kilka naraz) albo wybierz je z dysku. Dane z obu urządzeń zostaną przeliczone tą samą metodą.</p><button class="btn primary" onclick="pickFiles()">Wybierz pliki .fit</button>`:`<h2>Brak aktywności</h2><p>Zawodnik nie wgrał jeszcze żadnych treningów. Gdy to zrobi, pojawią się tutaj automatycznie.</p>`}</div></div>`;
+    main.innerHTML=`<div class="wrap home">${restPanel(true)}${aiPanel()}<div class="empty dropzone">${isOwner()?`<h2>Wgraj pierwsze treningi</h2><p>Przeciągnij tutaj pliki .fit z zegarka lub licznika (możesz kilka naraz) albo wybierz je z dysku. Dane z obu urządzeń zostaną przeliczone tą samą metodą.</p><button class="btn primary" onclick="pickFiles()">Wybierz pliki .fit</button>`:`<h2>Brak aktywności</h2><p>Zawodnik nie wgrał jeszcze żadnych treningów. Gdy to zrobi, pojawią się tutaj automatycznie.</p>`}</div></div>`;
     bindRestPanel();bindAiPanel();bindRestChart(main,new Date().getFullYear(),new Date().getMonth()+1);S.redraw=()=>drawRestChart(new Date().getFullYear(),new Date().getMonth()+1);S.redraw();
     return;
   }
@@ -1547,8 +1568,7 @@ function renderList(){
   const sum=(arr,f)=>arr.reduce((x,a)=>x+(f(a)||0),0);
   const seen=S.state?.seen||{},since=S.state?.since||0;
   main.innerHTML=`<div class="wrap home">
-    ${restPanel()}
-    ${restChartSection(new Date().getFullYear(),new Date().getMonth()+1,'Tętno spoczynkowe – wykres')}
+    ${restPanel(true)}
     <div class="overview">
       <section class="panel"><h2>Ten tydzień</h2><p class="sub">od ${new Date(wk).toLocaleDateString('pl-PL',{day:'numeric',month:'long'})}</p>
         <div class="week-now">
@@ -1560,7 +1580,7 @@ function renderList(){
     </div>
     ${aiPanel()}
     <section>
-      <div class="sec-h"><h2 style="font-size:28px">Treningi</h2>${importBar()}<div class="filters">${cats.map(([k,l])=>`<button class="chip" aria-pressed="${S.filter===k}" data-f="${k}">${l}</button>`).join('')}</div></div>
+      <div class="sec-h"><h2 style="font-size:28px">Treningi</h2><div class="filters">${cats.map(([k,l])=>`<button class="chip" aria-pressed="${S.filter===k}" data-f="${k}">${l}</button>`).join('')}</div></div>
       ${[...weeks.entries()].map(([k,arr])=>{
         const end=new Date(k+6*864e5);
         return `<div class="week"><div class="week-h"><h3>${new Date(k).toLocaleDateString('pl-PL',{day:'numeric',month:'short'})} – ${end.toLocaleDateString('pl-PL',{day:'numeric',month:'short',year:'numeric'})}</h3>
@@ -2122,7 +2142,7 @@ async function editRest(day){
   if(v===null)return;
   try{const bpm=parseBpm(v);if(bpm===(cur??null))return;if(await saveRest(day,bpm))render();}catch(e){toast(e.message);}
 }
-function restPanel(){
+function restPanel(withChart){
   const today=ymd(Date.now());const v=S.rest[today];
   const last=[];for(let i=6;i>=0;i--){const k=ymd(Date.now()-i*864e5);last.push([k,S.rest[k]]);}
   const vals=last.map(x=>x[1]).filter(x=>x!=null);const avg=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;
@@ -2130,7 +2150,10 @@ function restPanel(){
     ${isOwner()?`<div class="rest-in"><label for="restToday">Dziś</label><input id="restToday" inputmode="numeric" maxlength="3" value="${v??''}" placeholder="np. 52"><span class="muted">bpm</span><button class="btn primary" id="restSave">Zapisz</button></div>`
       :`<div class="rest-in"><span class="muted">Dziś:</span> <b>${v!=null?v+' bpm':'brak wpisu'}</b></div>`}</div>
     <div class="rest-week">${last.map(([k,x])=>`<div class="${k===today?'td':''}"><span>${new Date(k+'T12:00').toLocaleDateString('pl-PL',{weekday:'short'})}</span><b>${x??'–'}</b></div>`).join('')}
-      <div class="avg"><span>śr. 7 dni</span><b>${avg!=null?nf(avg):'–'}</b></div></div></section>`;
+      <div class="avg"><span>śr. 7 dni</span><b>${avg!=null?nf(avg):'–'}</b></div></div>
+    ${withChart?`<div class="restchart"><div class="rest-cth"><p class="sub" style="margin:0" id="restStat">${(()=>{const {v,avg:a}=restMonthVals(new Date().getFullYear(),new Date().getMonth()+1);return restStatTxt(new Date().getFullYear(),new Date().getMonth()+1,v,a);})()}</p>
+      <div class="seg" id="restRange"><button data-rr="month" aria-pressed="${S.restRange!=='all'}">W miesiącu</button><button data-rr="all" aria-pressed="${S.restRange==='all'}">Pełen okres</button></div></div>
+      <canvas class="cv" id="restcv"></canvas></div>`:''}</section>`;
 }
 function bindRestPanel(){
   const b=$('#restSave');if(!b)return;const inp=$('#restToday');
@@ -2287,13 +2310,13 @@ function renderDisp(ym){
   main.innerHTML=`<div class="wrap home disp">
     <div class="cal-h"><h1>Plan <span class="muted wrange">${MONTHS[m-1]} ${y}</span></h1>
       <div class="cal-nav">${viewToggle('month',`${y}-${m}`,ymd(mondayOf(new Date(y,m-1,y===now.getFullYear()&&m===now.getMonth()+1?now.getDate():1))))}<a class="btn" href="#/dyspozycja/${prev}" aria-label="Poprzedni miesiąc">‹</a><a class="btn" href="#/dyspozycja/${now.getFullYear()}-${now.getMonth()+1}">Bieżący</a><a class="btn" href="#/dyspozycja/${next}" aria-label="Następny miesiąc">›</a></div></div>
-    <div class="legend disp-leg"><span><i class="lsw coachsw"></i><em>plan trenera</em></span><span><i class="lsw athsw"></i><em>plan zawodnika</em></span><span style="color:var(--ok)">${icon('free')}<em>wolny czas</em></span>${Object.entries(PLAN_SPORTS).map(([k,[l,c]])=>`<span style="color:${c}">${icon(k)}<em>${l}</em></span>`).join('')}<span style="color:var(--ok)">${icon('done')}<em>wykonany</em></span><span style="color:var(--hr)">${icon('race')}<em>start</em> <b class="prio" style="background:var(--hr)">A</b><b class="prio" style="background:#F59F00">B</b><b class="prio" style="background:var(--spd)">C</b></span></div>
     <div class="tbl-wrap"><table class="cal-grid disp-grid"><thead><tr>${['Pn','Wt','Śr','Cz','Pt','So','Nd'].map(d=>`<th>${d}</th>`).join('')}<th>Suma</th></tr></thead><tbody>
       ${weeks.map((w,wi)=>{const ks=w.filter(Boolean).map(dk);const fr=ks.reduce((s,k)=>s+availMin(k),0),pp=ks.reduce((s,k)=>s+planOf('plan',k).reduce((x,p)=>x+p.dur,0),0);
         const mon=w[0]?dk(w[0]):null;
         return `<tr>${w.map(cell).join('')}<td class="wk"><span class="wf">wolne <b>${fr?mfmt(fr):'–'}</b></span><span class="wp">plan <b>${pp?mfmt(pp):'–'}</b>${ks.flatMap(k=>planOf('plan',k)).length?` <i>(${ks.flatMap(k=>planOf('plan',k)).length} tr.)</i>`:''}</span>
           ${isOwner()&&mon&&!fr?`<button class="btn ghost copyw" data-mon="${mon}">↻ jak poprz. tydz.</button>`:''}</td></tr>`;}).join('')}
     </tbody></table></div>
+    <div class="legend disp-leg"><span><i class="lsw coachsw"></i><em>plan trenera</em></span><span><i class="lsw athsw"></i><em>plan zawodnika</em></span><span style="color:var(--ok)">${icon('free')}<em>wolny czas</em></span>${Object.entries(PLAN_SPORTS).map(([k,[l,c]])=>`<span style="color:${c}">${icon(k)}<em>${l}</em></span>`).join('')}<span style="color:var(--ok)">${icon('done')}<em>wykonany</em></span><span style="color:var(--hr)">${icon('race')}<em>start</em> <b class="prio" style="background:var(--hr)">A</b><b class="prio" style="background:#F59F00">B</b><b class="prio" style="background:var(--spd)">C</b></span></div>
     <section class="sec"><div class="sec-h"><h2>Analiza wolnego czasu i planu</h2></div>
     <section class="cal-stats">
       <div><b class="num" style="color:var(--ok)">${mfmt(freeM)}</b><span>wolnego czasu w miesiącu</span></div>
@@ -2342,12 +2365,12 @@ function openDay(day){
     </section>
 `:''}
     <section><h3><span style="color:var(--accent)">${icon('run',18)}</span>Plan treningu</h3>
-      ${pl.length?`<ul class="items">${pl.map(p=>`<li class="${p.author==='coach'?'bycoach':'byath'}"><span class="pl" style="--c:${PLAN_SPORTS[p.sport][1]}">${icon(p.sport,16)} ${PLAN_SPORTS[p.sport][0]}</span> <b>${mfmt(p.dur)}</b>${p.at?` o ${p.at}`:''}${p.zones&&p.zones.length?` <span class="zchip">${zonesTxt(p.zones)}</span>`:''}<span class="muted"> – ${p.author==='coach'?esc(S.names.coach||'Trener'):'zawodnik'}</span> ${approveBadge(p)}${p.desc?`<p class="pdesc">${esc(p.desc)}</p>`:''}${approveNote(p)}${S.me.role==='coach'&&byAthlete(p)?`<div class="apform">${p.approve
+      ${pl.length?`<ul class="items">${pl.map(p=>`<li class="${p.author==='coach'?'bycoach':'byath'}"><span class="pl" style="--c:${PLAN_SPORTS[p.sport][1]}">${icon(p.sport,16)} ${PLAN_SPORTS[p.sport][0]}</span> <b>${mfmt(p.dur)}</b>${p.at?` o ${p.at}`:''}${p.zones&&p.zones.length?` <span class="zchip">${zonesTxt(p.zones)}</span>`:''}<span class="muted"> – ${p.author==='coach'?esc(S.names.coach||'Trener'):'zawodnik'}</span> ${approveBadge(p)}${p.desc?`<p class="pdesc">${esc(p.desc)}</p>`:''}${planNotesHtml(p)}${approveNote(p)}${planEditHtml(p)}${S.me.role==='coach'&&byAthlete(p)?`<div class="apform">${p.approve
   ?`<div class="pact"><button class="btn ghost" data-apedit="${p.id}">Zmień uwagi</button><button class="btn ghost" data-apundo="${p.id}">Cofnij akceptację</button></div>`
   :''}<div class="apbox" id="ap-${p.id}" ${p.approve?'hidden':''}><label class="skipn">Uwagi dla zawodnika (opcjonalnie)<textarea id="apn-${p.id}" rows="2" maxlength="1000" placeholder="np. OK, ale trzymaj tętno w S2">${esc(p.approve?.note||'')}</textarea></label>
   <div class="pact"><button class="btn apbtn" data-approve="${p.id}">${icon('done',18)} ${p.approve?'Zapisz uwagi':'Akceptuj trening'}</button></div></div></div>`:''}${statusBlock(p,own)}${canEditPlan(p)?`<button class="del" data-del="${p.id}">Usuń</button>`:''}</li>`).join('')}</ul>`:'<p class="muted">Brak zaplanowanego treningu.</p>'}
       <div class="frow"><label>Rodzaj treningu<select id="plSport">${sportOpts}</select></label><label>Czas treningu (min)<input id="plDur" inputmode="numeric" value="60"></label></div>
-      <div class="zsel"><span class="effq">Strefy <span class="muted">(opcjonalnie, można kilka)</span></span><div class="zbtns">${ZN.map((z,i)=>`<button type="button" class="zb2" data-z="${z}" style="--zc:${HR_COL[i]}">${z}</button>`).join('')}</div></div>
+      <div class="zsel"><span class="effq">Strefy <span class="muted">(opcjonalnie, można kilka)</span></span><div class="zbtns" id="plZones">${ZN.map((z,i)=>`<button type="button" class="zb2" data-z="${z}" style="--zc:${HR_COL[i]}">${z}</button>`).join('')}</div></div>
       <div class="frow"><label class="grow">Opis treningu<textarea id="plDesc" rows="3" maxlength="2000" placeholder="np. 10 min rozgrzewki, 6×800 m w S4, 10 min schłodzenia"></textarea></label></div>
       <div class="frow end"><button class="btn primary" id="plAdd">Dodaj trening</button></div>
     </section>
@@ -2364,13 +2387,13 @@ function openDay(day){
   if(keepTop){const b=d.querySelector('.dlg-b');if(b){b.scrollTop=keepTop;requestAnimationFrame(()=>b.scrollTop=keepTop);}}
   const refresh=()=>{render();openDay(day);};
   const guard=async(fn,btn)=>{if(btn)btn.disabled=true;try{await fn();refresh();}catch(e){toast(e.message,6000);if(btn)btn.disabled=false;}};
-  d.querySelectorAll('.zb2').forEach(b=>b.onclick=()=>b.classList.toggle('on'));
+  d.querySelectorAll('#plZones .zb2').forEach(b=>b.onclick=()=>b.classList.toggle('on'));
   d.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{if(confirm('Usunąć ten wpis?'))guard(()=>planDel(b.dataset.del),b);});
   d.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>guard(async()=>{const id=b.dataset.approve;const note=d.querySelector('#apn-'+id).value.trim().slice(0,1000);
     if(!S.local)await api('planApprove',{id,approve:true,note});const x=S.plan.find(x=>x.id===id);if(x)x.approve={note,ts:Date.now()};toast('Trening zaakceptowany.');},b));
   d.querySelectorAll('[data-apedit]').forEach(b=>b.onclick=()=>{const id=b.dataset.apedit;d.querySelector('#ap-'+id).hidden=false;b.parentElement.hidden=true;});
   d.querySelectorAll('[data-apundo]').forEach(b=>b.onclick=()=>guard(async()=>{const id=b.dataset.apundo;if(!S.local)await api('planApprove',{id,approve:false});const x=S.plan.find(x=>x.id===id);if(x)delete x.approve;toast('Cofnięto akceptację.');},b));
-  bindStatus(d,guard);
+  bindStatus(d,guard);bindPlanEdit(d,refresh);
   d.querySelectorAll('[data-skipask]').forEach(b=>b.onclick=()=>{const id=b.dataset.skipask;d.querySelector('#skip-'+id).hidden=false;const a=d.querySelector('#ask-'+id);if(a)a.hidden=true;b.parentElement.hidden=true;});
   d.querySelectorAll('[data-skipc]').forEach(b=>b.onclick=()=>refresh());
   d.querySelectorAll('[data-skip]').forEach(b=>b.onclick=()=>guard(async()=>{const id=b.dataset.skip;const reason=(d.querySelector(`input[name="sr-${id}"]:checked`)||{}).value||'inna';const note=d.querySelector('#skn-'+id).value.trim().slice(0,200);
@@ -2388,7 +2411,7 @@ function openDay(day){
     await planSave('avail',{...(keep?{id:keep.id}:{}),day,dur:m,note});toast(`Wolny czas: ${mfmt(m)}.`);},b));
   const avN=$('#avNote');if(avN&&av.length===1&&av[0].dur!=null)avN.onchange=()=>guard(async()=>{await planSave('avail',{id:av[0].id,day,dur:av[0].dur,note:avN.value});toast('Zapisano notatkę.');});
   $('#plAdd').onclick=()=>guard(async()=>{const dur=Math.round(parseFloat($('#plDur').value));if(!isFinite(dur)||dur<5||dur>720)throw new Error('Czas treningu: od 5 do 720 minut.');
-    const zones=[...d.querySelectorAll('.zb2.on')].map(b=>b.dataset.z);
+    const zones=[...d.querySelectorAll('#plZones .zb2.on')].map(b=>b.dataset.z);
     await planSave('plan',{day,sport:$('#plSport').value,dur,desc:$('#plDesc').value,zones});toast('Dodano trening do planu.');},$('#plAdd'));
   $('#raAdd').onclick=()=>guard(async()=>{const name=$('#raName').value.trim();if(!name)throw new Error('Podaj nazwę zawodów.');const goal=$('#raGoal').value.trim();
     if(goal&&!/^(\d{1,2}:)?[0-5]?\d:[0-5]\d$/.test(goal))throw new Error('Przewidywany czas podaj jako g:mm:ss lub mm:ss, np. 1:45:00.');
@@ -2425,7 +2448,7 @@ function renderDispWeek(monKey){
         <div class="wph">${icon(p.sport,18)}<b>${PLAN_SPORTS[p.sport][0]}</b><span class="wdur">${mfmt(p.dur)}</span>${p.zones&&p.zones.length?`<span class="zchip">${zonesTxt(p.zones)}</span>`:''}${p.ai?'<span class="aitag">Claude</span>':''}</div>
         ${statusBox(p,true)}${byAthlete(p)?`<div>${approveBadge(p,true)}</div>`:''}
         ${p.desc?`<p>${esc(p.desc)}</p>`:'<p class="muted">bez opisu</p>'}
-        ${approveNote(p)}<span class="wby">${p.author==='coach'?'plan: '+esc(S.names.coach||'Trener'):'plan: zawodnik'}</span></div>`).join('')}
+        ${planNotesHtml(p)}${approveNote(p)}<span class="wby">${p.author==='coach'?'plan: '+esc(S.names.coach||'Trener'):'plan: zawodnik'}</span></div>`).join('')}
       ${extra.map(a=>`<a class="wact" href="#/a/${encodeURIComponent(a.id)}" onclick="event.stopPropagation()">${icon(catIcon(a),15)}${icon('done',12)} ${esc(a.name)} <span class="muted">${a.s.d>50?km(a.s.d,1)+' km, ':''}${dur(a.s.mt||a.s.et,true)}</span></a>`).join('')}
       ${empty?`<p class="wempty">${k<todayK?'—':(isOwner()?'+ dodaj wolny czas lub trening':'+ zaplanuj trening')}</p>`:''}
     </article>`;
@@ -2638,6 +2661,58 @@ function bindProposal(){
   $('#propDrop').onclick=()=>{S.aiProposal=null;renderClaudeTab();};
 }
 
+/* ===== Edycja zaplanowanego treningu i uwagi (bez usuwania i dodawania od nowa) ===== */
+function planNotesHtml(p){
+  const n=p.notes||{};const row=(r,l)=>n[r]&&n[r].text?`<div class="pnote ${r}"><b>${l}:</b> ${esc(n[r].text)}</div>`:'';
+  return row('athlete','Uwagi zawodnika')+row('coach','Uwagi trenera');
+}
+function planEditHtml(p){
+  const mine=p.notes&&p.notes[S.me.role]?p.notes[S.me.role].text:'';
+  return `<div class="pact pedbtns">${p.author===S.me.role?`<button class="btn ghost" data-pedit="${p.id}">✎ Edytuj trening</button>`:''}<button class="btn ghost" data-pnote="${p.id}">✎ ${mine?'Zmień uwagi':'Dopisz uwagi'}</button></div>
+  <div class="pedit" id="pe-${p.id}" hidden>
+    <div class="frow"><label>Rodzaj<select id="pes-${p.id}">${Object.entries(PLAN_SPORTS).map(([k,[l]])=>`<option value="${k}"${k===p.sport?' selected':''}>${l}</option>`).join('')}</select></label>
+      <label>Czas (min)<input id="ped-${p.id}" inputmode="numeric" value="${p.dur}"></label></div>
+    <div class="zsel"><span class="effq">Strefy</span><div class="zbtns">${ZN.map((z,i)=>`<button type="button" class="zb2 ze${(p.zones||[]).includes(z)?' on':''}" data-z="${z}" style="--zc:${HR_COL[i]}">${z}</button>`).join('')}</div></div>
+    <label class="skipn">Opis treningu<textarea id="pex-${p.id}" rows="3" maxlength="2000">${esc(p.desc||'')}</textarea></label>
+    ${byAthlete(p)&&p.approve?'<p class="note" style="margin:0">Po zmianie trening będzie czekał na ponowną akceptację trenera.</p>':''}
+    <div class="pact"><button class="btn primary" data-pesave="${p.id}">Zapisz zmiany</button><button class="btn ghost" data-pecancel="${p.id}">Anuluj</button></div></div>
+  <div class="pedit" id="pn-${p.id}" hidden><label class="skipn">${S.me.role==='coach'?'Uwagi trenera':'Twoje uwagi'}<textarea id="pnx-${p.id}" rows="3" maxlength="1000" placeholder="np. przesuwam na wieczór, łydki trochę spięte">${esc(mine)}</textarea></label>
+    <div class="pact"><button class="btn primary" data-pnsave="${p.id}">Zapisz uwagi</button><button class="btn ghost" data-pncancel="${p.id}">Anuluj</button></div></div>`;
+}
+function bindPlanEdit(d,refresh){
+  const show=(id,which)=>{['pe','pn'].forEach(k=>{const el=d.querySelector(`#${k}-${id}`);if(el)el.hidden=k!==which;});};
+  d.querySelectorAll('[data-pedit]').forEach(b=>b.onclick=()=>show(b.dataset.pedit,'pe'));
+  d.querySelectorAll('[data-pnote]').forEach(b=>b.onclick=()=>{show(b.dataset.pnote,'pn');d.querySelector('#pnx-'+b.dataset.pnote).focus();});
+  d.querySelectorAll('[data-pecancel],[data-pncancel]').forEach(b=>b.onclick=()=>show(b.dataset.pecancel||b.dataset.pncancel,''));
+  d.querySelectorAll('.ze').forEach(b=>b.onclick=()=>b.classList.toggle('on'));
+  d.querySelectorAll('[data-pesave]').forEach(b=>b.onclick=async()=>{const id=b.dataset.pesave;const x=S.plan.find(x=>x.id===id);if(!x)return;
+    const dur=Math.round(parseFloat(d.querySelector('#ped-'+id).value));if(!(dur>=5&&dur<=720)){toast('Czas treningu: od 5 do 720 minut.');return;}
+    const zones=[...d.querySelector('#pe-'+id).querySelectorAll('.ze.on')].map(z=>z.dataset.z);
+    const item={id,day:x.day,sport:d.querySelector('#pes-'+id).value,dur,desc:d.querySelector('#pex-'+id).value,zones};
+    const rv=snapPlan(id);Object.assign(x,item);if(byAthlete(x))delete x.approve;refresh();toast('Zapisano zmiany.',1800);
+    bgApi('planSave',{kind:'plan',item},rv);});
+  d.querySelectorAll('[data-pnsave]').forEach(b=>b.onclick=()=>{const id=b.dataset.pnsave;const x=S.plan.find(x=>x.id===id);if(!x)return;
+    const text=d.querySelector('#pnx-'+id).value.trim().slice(0,1000);const rv=snapPlan(id);
+    x.notes={...(x.notes||{})};if(text)x.notes[S.me.role]={text,ts:Date.now()};else delete x.notes[S.me.role];
+    refresh();toast(text?'Zapisano uwagi.':'Usunięto uwagi.',1800);bgApi('planNote',{id,note:text},rv);});
+}
+
+/* ===== Import treningów – ikona w nagłówku ===== */
+function updateImpBtn(){const b=$('#impBtn');if(!b)return;b.hidden=!(S.ready&&!S.local&&isOwner()&&S.importInfo&&S.importInfo.folder);}
+function openImport(){
+  const ii=S.importInfo||{};const l=ii.last;const d=$('#setdlg');
+  d.innerHTML=`<div class="dlg-h"><h2>Import treningów</h2><button class="icon-btn" onclick="this.closest('dialog').close()" aria-label="Zamknij">✕</button></div>
+  <div class="dlg-b"><div class="impinfo"><span class="impst ${ii.auto?'on':'off'}">${ii.auto?'Automatyczny import włączony':'Automatyczny import wyłączony'}</span>
+    <p>${ii.auto?'Codziennie ok. 21:00 aplikacja sprawdza folder na Dysku i dodaje nowe pliki .fit.':'Aby włączyć codzienny import, uruchom w Apps Script funkcję wlaczImportCodzienny.'}</p>
+    ${l?`<p class="muted">Ostatni import: ${ago(l.at)} – dodano ${l.ok}${l.dup?`, duplikaty ${l.dup}`:''}${l.err?`, błędy ${l.err}`:''}.</p>`:''}</div>
+    <div class="pact"><button class="btn primary" id="impNowDlg">Importuj teraz</button><a class="btn" href="${esc(ii.folder||'#')}" target="_blank" rel="noopener">Otwórz folder importu</a><button class="btn" onclick="this.closest('dialog').close();pickFiles()">Wgraj pliki .fit z urządzenia</button></div></div>`;
+  d.showModal();
+  $('#impNowDlg').onclick=async e=>{const b=e.currentTarget;b.disabled=true;b.textContent='Importuję…';toast('Sprawdzam folder na Dysku… To może potrwać do kilku minut.',300000);
+    try{const r=await api('importNow');const msg=[`Dodano: ${r.ok}`];if(r.dup)msg.push(`duplikaty: ${r.dup}`);if(r.err.length)msg.push(`błędy: ${r.err.join('; ')}`);if(r.left)msg.push(`pozostało: ${r.left}`);
+      toast(msg.join(', '),r.err.length?10000:4000);S.importInfo.last={at:Date.now(),ok:r.ok,dup:r.dup,err:r.err.length};d.close();if(r.ok){const f=await api('init');cacheSave(f);applyInitSoft(f);}else render();}
+    catch(err){toast('Import nie powiódł się: '+err.message,8000);b.disabled=false;b.textContent='Importuj teraz';}};
+}
+
 /* ===== Czat zawodnik ↔ trener + powiadomienia o zmianach w planie ===== */
 function chatUnread(){if(S.local||!S.chat)return 0;return S.chat.filter(m=>m.role!==S.me.role&&m.ts>(S.chatSeen||0)).length;}
 function updateChatBadge(){const b=$('#chatBadge');if(!b)return;const n=chatUnread();b.hidden=!n;b.textContent=n>99?'99+':n;const btn=$('#chatBtn');if(btn)btn.hidden=!S.ready||S.local;}
@@ -2767,6 +2842,9 @@ function renderCalendar(ym){
   // 12 miesięcy
   const months=[];for(let k=11;k>=0;k--){const d=new Date(y,m-1-k,1),e=new Date(y,m-k,1);const arr=all.filter(a=>a.start>=d.getTime()&&a.start<e.getTime());months.push({y:d.getFullYear(),m:d.getMonth()+1,t:sum(arr,a=>a.s.mt),n:arr.length,km:sum(arr,a=>a.s.d)/1000});}
   const mx=Math.max(1,...months.map(x=>x.t));
+  const firstA=all.length?Math.min(...all.map(a=>a.start)):Date.now();const f0=new Date(firstA);const monthsAll=[];
+  for(let d=new Date(f0.getFullYear(),f0.getMonth(),1);d<=new Date(now.getFullYear(),now.getMonth(),1);d=new Date(d.getFullYear(),d.getMonth()+1,1)){const e=new Date(d.getFullYear(),d.getMonth()+1,1);const arr=all.filter(a=>a.start>=d.getTime()&&a.start<e.getTime());monthsAll.push({y:d.getFullYear(),m:d.getMonth()+1,t:sum(arr,a=>a.s.mt)/3600,n:arr.length,km:sum(arr,a=>a.s.d)/1000});}
+  const mxAll=Math.max(1,...monthsAll.map(x=>x.t));
   const dk=d=>`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
   const future=d=>new Date(y,m-1,d).getTime()>Date.now();
   const restCell=d=>{const v=S.rest[dk(d)];if(v!=null)return isOwner()?`<button class="rhr" data-day="${dk(d)}" title="Tętno spoczynkowe – kliknij, aby zmienić">♥ ${v}</button>`:`<span class="rhr">♥ ${v}</span>`;
@@ -2778,7 +2856,11 @@ function renderCalendar(ym){
   main.innerHTML=`<div class="wrap home cal">
     <div class="cal-h"><h1>${MONTHS[m-1].charAt(0).toUpperCase()+MONTHS[m-1].slice(1)} ${y}</h1>
       <div class="cal-nav"><a class="btn" href="#/kalendarz/${prev}" aria-label="Poprzedni miesiąc">‹</a><a class="btn" href="#/kalendarz/${now.getFullYear()}-${now.getMonth()+1}">Bieżący</a><a class="btn" href="#/kalendarz/${next}" aria-label="Następny miesiąc">›</a></div></div>
-    <div class="months">${months.map(x=>`<a href="#/kalendarz/${x.y}-${x.m}" class="mb${x.y===y&&x.m===m?' on':''}" title="${x.n} treningów, ${nf(x.km,0)} km"><i style="height:${Math.max(2,x.t/mx*54)}px"></i><span>${MONTHS[x.m-1].slice(0,3)}</span></a>`).join('')}</div>
+    <div class="tbl-wrap cal-grid-wrap"><table class="cal-grid"><thead><tr>${['Pn','Wt','Śr','Cz','Pt','So','Nd'].map(d=>`<th>${d}</th>`).join('')}<th>Suma</th></tr></thead><tbody>
+      ${weeks.map(w=>{const wa=w.flatMap(d=>d?perDay[d]||[]:[]);return `<tr>${w.map(d=>`<td class="${d?'':'out'}${isToday(d)?' today':''}">${d?`<span class="dn">${d}${restCell(d)}</span>${(perDay[d]||[]).map(chip).join('')}`:''}</td>`).join('')}
+        <td class="wk">${wa.length?`<b>${dur(sum(wa,a=>a.s.mt),true)}</b><span>${km(sum(wa,a=>a.s.d),1)} km</span><span>${wa.length} ${plural(wa.length,'trening','treningi','treningów')}</span>`:'<span>—</span>'}</td></tr>`;}).join('')}
+    </tbody></table></div>
+    <section class="sec"><div class="sec-h"><h2>Podsumowanie miesiąca</h2></div>
     <section class="cal-stats">
       <div><b class="num">${acts.length}</b><span>${plural(acts.length,'trening','treningi','treningów')} w ${days} ${days===1?'dniu':'dniach'}</span></div>
       <div><b class="num">${dur(sum(acts,a=>a.s.mt),true)}</b><span>czas ruchu</span></div>
@@ -2787,15 +2869,10 @@ function renderCalendar(ym){
       <div><b class="num">${nf(sum(acts,a=>a.s.cal))}</b><span>kcal</span></div>
       <div><b class="num">${nf(sum(acts,a=>loadOf(a)?.v))}</b><span>obciążenie</span></div>
       ${hrAvg?`<div><b class="num">${nf(hrAvg)}</b><span>śr. tętno (bpm)</span></div>`:''}
-      ${mRestAvg!=null?`<div><b class="num" style="color:var(--hr)">${nf(mRestAvg)}</b><span>śr. tętno spoczynkowe (${mRest.length} ${plural(mRest.length,'pomiar','pomiary','pomiarów')})</span></div>`:''}
       ${runCad?`<div><b class="num">${nf(runCad)}</b><span>śr. kadencja biegu</span></div>`:''}
     </section>
-    <div class="tbl-wrap cal-grid-wrap"><table class="cal-grid"><thead><tr>${['Pn','Wt','Śr','Cz','Pt','So','Nd'].map(d=>`<th>${d}</th>`).join('')}<th>Suma</th></tr></thead><tbody>
-      ${weeks.map(w=>{const wa=w.flatMap(d=>d?perDay[d]||[]:[]);return `<tr>${w.map(d=>`<td class="${d?'':'out'}${isToday(d)?' today':''}">${d?`<span class="dn">${d}${restCell(d)}</span>${(perDay[d]||[]).map(chip).join('')}`:''}</td>`).join('')}
-        <td class="wk">${wa.length?`<b>${dur(sum(wa,a=>a.s.mt),true)}</b><span>${km(sum(wa,a=>a.s.d),1)} km</span><span>${wa.length} ${plural(wa.length,'trening','treningi','treningów')}</span>`:'<span>—</span>'}</td></tr>`;}).join('')}
-    </tbody></table></div>
+    </section>
     ${ratingSummary(acts,all.filter(a=>a.start>=new Date(y,m-2,1).getTime()&&a.start<start.getTime()))}
-    ${restChartSection(y,m)}
     ${acts.length?`<section class="sec"><div class="sec-h"><h2>Rodzaje treningów</h2></div><div class="tbl-wrap"><table><thead><tr><th>Rodzaj</th><th>Liczba</th><th>Czas</th><th>Dystans</th><th>Śr. tempo / prędkość</th><th>W górę</th><th>Tętno śr.</th><th>Kalorie</th><th>Obciążenie</th></tr></thead><tbody>
       ${Object.entries(byCat).map(([k,arr])=>{const d=sum(arr,a=>a.s.d),t=sum(arr,a=>a.s.mt);const ht=arr.filter(a=>a.s.hr).reduce((x,a)=>x+a.s.mt,0);const h=ht?arr.filter(a=>a.s.hr).reduce((x,a)=>x+a.s.hr*a.s.mt,0)/ht:null;
         return `<tr><td><span class="dot" style="background:${CATS[k][1]}"></span>${CATS[k][0]}</td><td>${arr.length}</td><td>${dur(t,true)}</td><td>${km(d,1)} km</td><td>${d>50&&t?(k==='run'?pace(d/t)+' /km':nf(d/t*3.6,1)+' km/h'):'–'}</td><td>${nf(sum(arr,a=>a.s.gain))} m</td><td>${h?nf(h)+' bpm':'–'}</td><td>${nf(sum(arr,a=>a.s.cal))}</td><td>${nf(sum(arr,a=>loadOf(a)?.v))}</td></tr>`;}).join('')}
@@ -2808,10 +2885,11 @@ function renderCalendar(ym){
     </div>
     ${runs.length&&runs.some(a=>!a.paceHist)?'<p class="note">Strefy tempa obejmują tylko biegi wgrane po dodaniu tej funkcji.</p>':''}`
     :`<div class="empty" style="margin-top:20px"><h2>Brak treningów w tym miesiącu</h2><p>Wybierz inny miesiąc strzałkami lub z wykresu powyżej.</p></div>`}
+    <section class="sec"><div class="sec-h"><h2>Cały okres</h2><span class="muted">czas ruchu w kolejnych miesiącach – kliknij, aby przejść</span></div>
+    <div class="months allm">${monthsAll.map(x=>`<a href="#/kalendarz/${x.y}-${x.m}" class="mb${x.y===y&&x.m===m?' on':''}" title="${x.n} ${plural(x.n,'trening','treningi','treningów')}, ${nf(x.km,0)} km, ${dur(x.t*3600,true)}"><b>${x.n||''}</b><i style="height:${Math.max(2,x.t/mxAll*54)}px"></i><span>${MONTHS[x.m-1].slice(0,3)}${x.m===1||x===monthsAll[0]?' '+String(x.y).slice(2):''}</span></a>`).join('')}</div></section>
   </div>`;
   main.querySelectorAll('button.rhr').forEach(b=>b.onclick=e=>{e.preventDefault();editRest(b.dataset.day);});
-  bindRestChart(main,y,m);
-  S.redraw=()=>drawRestChart(y,m);S.redraw();
+  S.redraw=null;
 }
 
 function importBar(){
