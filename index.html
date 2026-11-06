@@ -919,6 +919,14 @@ body.chat-open .fab{display:none}
 .logsec .togbox{border-color:var(--ok)}
 #raceBox{border-color:var(--hr)}
 @media (prefers-reduced-motion:reduce){.bigtoggle .chev{transition:none}}
+.plan-t{--tc:var(--accent)}#planBox{border-color:var(--accent)}
+
+/* brak dyspozycji – wyraźna ikona */
+.disp-grid td.dd>span.av.none{background:#ECEDEF!important;border-left:3px solid #868E96!important;color:#495057!important;font-weight:600}
+.disp-grid .av.none .ic{color:#C92A2A!important}
+.wfree.none{background:#ECEDEF;border-left:3px solid #868E96}.wfree.none .ic{color:#C92A2A}
+.avo.none{display:inline-flex;align-items:center;gap:4px}.avo.none .ic{color:#C92A2A}.avo.none.on .ic{color:#fff}
+@media (max-width:620px){.disp-grid td.dd>span.av.none{justify-content:center}}
 </style>
 </head>
 <body>
@@ -2256,6 +2264,7 @@ const ICONS={
   walk:'<circle cx="13" cy="4.5" r="2"/><path d="M10 21l2-6 3 3v3"/><path d="M8 12l2.5-4 3.5 1 1.5 3.5 2 1"/><path d="M12 15l1.5-5.5"/>',
   test:'<circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5l3.5-3.5M10 3h4M12 3v3"/>',
   skip:'<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+  noavail:'<circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/>',
   change:'<path d="M4 8h13l-3-3M20 16H7l3 3"/>'
 };
 function icon(k,size=14){return `<svg class="ic" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]||ICONS.other}</svg>`;}
@@ -2344,7 +2353,7 @@ function renderDisp(ym){
       <span class="dn">${d}</span>
       ${pl.length||av.length?`<span class="dsumm">${pl.length?`${pl.length} tr., ${mfmt(pl.reduce((x,p)=>x+p.dur,0))}`:''}${pl.length&&av.length?' / ':''}${av.length?`wolne ${mfmt(availMin(k))}`:''}</span>`:''}
       ${races.map(r=>`<span class="rbadge" style="--pc:${PRIO[r.prio][2]}" title="Start ${r.prio}: ${esc(r.name)}">${icon('race',12)}<b>${r.prio}</b> <span class="nm">${esc(r.name)}</span></span>`).join('')}
-      ${isNoAvail(k)?`<span class="av none" title="Brak dyspozycji">${icon('skip',12)}<span class="nm">brak </span>dysp.</span>`:av.length?`<span class="av" title="Wolny czas">${icon('free',14)}<span class="nm">wolne </span>${(m=>m<60?m+'′':nf(m/60,m%60?1:0)+' h')(availMin(k))}</span>`:''}
+      ${isNoAvail(k)?`<span class="av none" title="Brak dyspozycji">${icon('noavail',15)}<span class="nm">brak dyspozycji</span></span>`:av.length?`<span class="av" title="Wolny czas">${icon('free',14)}<span class="nm">wolne </span>${(m=>m<60?m+'′':nf(m/60,m%60?1:0)+' h')(availMin(k))}</span>`:''}
       ${pl.map(p=>`<span class="pl ${p.author==='coach'?'bycoach':'byath'}${planDone(p)?' done':''}${p.skip?' skip':''}${p.change?' chg':''}${byAthlete(p)&&!p.approve?' pend':''}" style="--c:${PLAN_SPORTS[p.sport][1]}" title="${PLAN_SPORTS[p.sport][0]} ${p.dur} min${p.zones&&p.zones.length?' ('+zonesTxt(p.zones)+')':''}${planDone(p)?' – wykonany':''}">${icon(p.sport,15)}<span class="nm">${PLAN_SPORTS[p.sport][0]} </span>${p.dur}′${p.zones&&p.zones.length?`<span class="nm zmini"> ${zonesTxt(p.zones)}</span>`:''}${planDone(p)?`<span class="ok">${icon('done',11)}</span>`:''}</span>${p.desc?`<span class="pdx">${esc(p.desc)}</span>`:''}`).join('')}
       ${acts.filter(a=>!pl.some(p=>sameCat(p.sport,a))).map(a=>`<span class="dn-act" title="Wykonany: ${esc(a.name)}">${icon(catIcon(a),12)}${icon('done',10)}<span class="nm"> ${esc(CATS[catOf(a)][0])}</span></span>`).join('')}
     </td>`;};
@@ -2389,6 +2398,8 @@ function approveBadge(p,small){if(p.logged)return `<span class="appr logd${small
 function approveNote(p){return byAthlete(p)&&p.approve&&p.approve.note?`<div class="apnote"><b>Uwagi trenera:</b> ${esc(p.approve.note)}</div>`:'';}
 const canEditPlan=(x)=>x.kind==='avail'?isOwner():x.kind==='race'?true:x.author===S.me.role;
 
+/* po dodaniu treningu / startu – zamknij okno i wróć do kalendarza planu */
+function closeDayAfter(){S.closeDay=true;}
 function openDay(day){
   const d=$('#setdlg');
   // ponowne otwarcie tego samego dnia (po zapisie) – zachowaj przewinięcie okna
@@ -2401,7 +2412,7 @@ function openDay(day){
   <div class="dlg-b day-dlg">
     ${own?`    <section><h3><span style="color:var(--ok)">${icon('free',18)}</span>Wolny czas${free?` <span class="muted">(${mfmt(free)})</span>`:''}</h3>
       ${av.length?`<ul class="items">${av.map(a=>`<li><b>${a.none?'Brak dyspozycji':mfmt(avDur(a))}</b>${a.from?` <span class="muted">(${a.from}–${a.to})</span>`:''}${a.note?` – ${esc(a.note)}`:''}${own?`<button class="del" data-del="${a.id}">Usuń</button>`:''}</li>`).join('')}</ul>`:`<p class="muted">Ile masz czasu na trening tego dnia?</p>`}
-      <div class="avopts" role="group" aria-label="Wolny czas">${AV_OPTS.map(m=>`<button type="button" class="avo${free===m&&av.length===1?' on':''}" data-m="${m}">${m<60?m+' min':nf(m/60,m%60?1:0)+' h'}</button>`).join('')}<button type="button" class="avo none${av.some(x=>x.none)?' on':''}" data-m="0">Brak dyspozycji</button></div>
+      <div class="avopts" role="group" aria-label="Wolny czas">${AV_OPTS.map(m=>`<button type="button" class="avo${free===m&&av.length===1?' on':''}" data-m="${m}">${m<60?m+' min':nf(m/60,m%60?1:0)+' h'}</button>`).join('')}<button type="button" class="avo none${av.some(x=>x.none)?' on':''}" data-m="0">${icon('noavail',15)} Brak dyspozycji</button></div>
       <div class="frow"><label class="grow">Notatka (opcjonalnie)<input id="avNote" maxlength="200" placeholder="np. tylko basen" value="${esc(av.length===1?av[0].note||'':'')}"></label></div>
     </section>
 `:''}
@@ -2410,10 +2421,12 @@ function openDay(day){
   ?`<div class="pact"><button class="btn ghost" data-apedit="${p.id}">Zmień uwagi</button><button class="btn ghost" data-apundo="${p.id}">Cofnij akceptację</button></div>`
   :''}<div class="apbox" id="ap-${p.id}" ${p.approve?'hidden':''}><label class="skipn">Uwagi dla zawodnika (opcjonalnie)<textarea id="apn-${p.id}" rows="2" maxlength="1000" placeholder="np. OK, ale trzymaj tętno w S2">${esc(p.approve?.note||'')}</textarea></label>
   <div class="pact"><button class="btn apbtn" data-approve="${p.id}">${icon('done',18)} ${p.approve?'Zapisz uwagi':'Akceptuj trening'}</button></div></div></div>`:''}${statusBlock(p,own)}${canEditPlan(p)?`<button class="del" data-del="${p.id}">Usuń</button>`:''}</li>`).join('')}</ul>`:'<p class="muted">Brak zaplanowanego treningu.</p>'}
+      <button type="button" class="bigtoggle plan-t" data-tog="planBox" aria-expanded="false">${icon('run',20)}<span>Zaplanuj trening<small>rodzaj, czas, strefy i opis</small></span><i class="chev">▾</i></button>
+      <div class="togbox" id="planBox" hidden>
       <div class="frow"><label>Rodzaj treningu<select id="plSport">${sportOpts}</select></label><label>Czas treningu (min)<input id="plDur" inputmode="numeric" value="60"></label></div>
       <div class="zsel"><span class="effq">Strefy <span class="muted">(opcjonalnie, można kilka)</span></span><div class="zbtns" id="plZones">${ZN.map((z,i)=>`<button type="button" class="zb2" data-z="${z}" style="--zc:${HR_COL[i]}">${z}</button>`).join('')}</div></div>
       <div class="frow"><label class="grow">Opis treningu<textarea id="plDesc" rows="3" maxlength="2000" placeholder="np. 10 min rozgrzewki, 6×800 m w S4, 10 min schłodzenia"></textarea></label></div>
-      <div class="frow end"><button class="btn primary" id="plAdd">Dodaj trening</button></div>
+      <div class="frow end"><button class="btn primary" id="plAdd">Zapisz trening</button></div></div>
     </section>
     ${own?logFormHtml(day):''}
     <section>${races.length?`<h3><span style="color:var(--hr)">${icon('race',18)}</span>Start w zawodach</h3>`:''}
@@ -2429,7 +2442,7 @@ function openDay(day){
   if(!d.open)d.showModal();
   if(keepTop){const b=d.querySelector('.dlg-b');if(b){b.scrollTop=keepTop;requestAnimationFrame(()=>b.scrollTop=keepTop);}}
   const refresh=()=>{render();openDay(day);};
-  const guard=async(fn,btn)=>{if(btn)btn.disabled=true;try{await fn();refresh();}catch(e){toast(e.message,6000);if(btn)btn.disabled=false;}};
+  const guard=async(fn,btn)=>{if(btn)btn.disabled=true;try{await fn();if(S.closeDay){S.closeDay=false;d.close();render();}else refresh();}catch(e){toast(e.message,6000);if(btn)btn.disabled=false;}};
   d.querySelectorAll('#plZones .zb2').forEach(b=>b.onclick=()=>b.classList.toggle('on'));
   d.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{if(confirm('Usunąć ten wpis?'))guard(()=>planDel(b.dataset.del),b);});
   d.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>guard(async()=>{const id=b.dataset.approve;const note=d.querySelector('#apn-'+id).value.trim().slice(0,1000);
@@ -2457,10 +2470,10 @@ function openDay(day){
   const avN=$('#avNote');if(avN&&av.length===1&&av[0].dur!=null)avN.onchange=()=>guard(async()=>{await planSave('avail',{id:av[0].id,day,dur:av[0].dur,note:avN.value});toast('Zapisano notatkę.');});
   $('#plAdd').onclick=()=>guard(async()=>{const dur=Math.round(parseFloat($('#plDur').value));if(!isFinite(dur)||dur<5||dur>720)throw new Error('Czas treningu: od 5 do 720 minut.');
     const zones=[...d.querySelectorAll('#plZones .zb2.on')].map(b=>b.dataset.z);
-    await planSave('plan',{day,sport:$('#plSport').value,dur,desc:$('#plDesc').value,zones});toast('Dodano trening do planu.');},$('#plAdd'));
+    await planSave('plan',{day,sport:$('#plSport').value,dur,desc:$('#plDesc').value,zones});toast('Dodano trening do planu.');closeDayAfter();},$('#plAdd'));
   $('#raAdd').onclick=()=>guard(async()=>{const name=$('#raName').value.trim();if(!name)throw new Error('Podaj nazwę zawodów.');const goal=$('#raGoal').value.trim();
     if(goal&&!/^(\d{1,2}:)?[0-5]?\d:[0-5]\d$/.test(goal))throw new Error('Przewidywany czas podaj jako g:mm:ss lub mm:ss, np. 1:45:00.');
-    await planSave('race',{day,name,prio:$('#raPrio').value,disc:$('#raDisc').value,dist:$('#raDist').value,goal});toast('Dodano start.');},$('#raAdd'));
+    await planSave('race',{day,name,prio:$('#raPrio').value,disc:$('#raDisc').value,dist:$('#raDist').value,goal});toast('Dodano start.');closeDayAfter();},$('#raAdd'));
 }
 
 /* --- widok tygodnia: pełne opisy planu, notatki i starty --- */
@@ -2488,7 +2501,7 @@ function renderDispWeek(monKey){
       <header><b>${d.toLocaleDateString('pl-PL',{weekday:'long'})}</b><span>${d.toLocaleDateString('pl-PL',{day:'numeric',month:'long'})}</span>
         ${pl.length||free?`<span class="dsum"><b>${pl.length}</b> ${plural(pl.length,'trening','treningi','treningów')}${pl.length?` (${mfmt(pl.reduce((x,p)=>x+p.dur,0))})`:''}, wolne <b>${free?mfmt(free):'–'}</b></span>`:''}</header>
       ${races.map(r=>`<div class="wrace" style="--pc:${PRIO[r.prio][2]}">${icon('race',16)}<div><b><span class="prio" style="background:${PRIO[r.prio][2]}">${r.prio}</span> ${esc(r.name)}</b><span>${RACE_DISC[r.disc]}${r.dist?', '+esc(r.dist):''}${r.goal?`, cel ${esc(r.goal)}`:''}</span></div></div>`).join('')}
-      ${isNoAvail(k)?`<div class="wfree none">${icon('skip',16)}<div><b>Brak dyspozycji</b>${av.filter(a=>a.note).map(a=>`<span>${esc(a.note)}</span>`).join('')}</div></div>`:''}
+      ${isNoAvail(k)?`<div class="wfree none">${icon('noavail',18)}<div><b>Brak dyspozycji</b>${av.filter(a=>a.note).map(a=>`<span>${esc(a.note)}</span>`).join('')}</div></div>`:''}
       ${free?`<div class="wfree">${icon('free',16)}<div><b>Wolny czas: ${(m=>m<60?m+' min':nf(m/60,m%60?1:0)+' h')(free)}</b>${av.filter(a=>a.note).map(a=>`<span>${esc(a.note)}</span>`).join('')}</div></div>`:''}
       ${pl.map(p=>`<div class="wplan ${p.author==='coach'?'bycoach':'byath'}${planDone(p)?' done':''}${p.skip?' skip':''}${p.change?' chg':''}" style="--c:${PLAN_SPORTS[p.sport][1]}">
         <div class="wph">${icon(p.sport,18)}<b>${PLAN_SPORTS[p.sport][0]}</b><span class="wdur">${mfmt(p.dur)}</span>${p.zones&&p.zones.length?`<span class="zchip">${zonesTxt(p.zones)}</span>`:''}${p.ai?'<span class="aitag">Claude</span>':''}</div>
@@ -2780,7 +2793,7 @@ function bindLogForm(d,day,refresh){
     if(!sp){toast('Wybierz rodzaj treningu.');return;}if(!(du>=5&&du<=720)){toast('Podaj czas od 5 do 720 minut.');return;}
     if(d.querySelector('#logDist').value.trim()&&!(ds>0&&ds<=500)){toast('Dystans: od 0,1 do 500 km.');return;}
     const item={day,sport:sp.dataset.sp,dur:du,desc:d.querySelector('#logNote').value,done:true,logged:true,effort:sel?+sel.dataset.v:undefined,dist:ds>0?Math.round(ds*100)/100:undefined};
-    b.disabled=true;try{await planSave('plan',item);toast('Dodano wykonany trening.');refresh();}catch(e){toast(e.message,6000);b.disabled=false;}};
+    b.disabled=true;try{await planSave('plan',item);toast('Dodano wykonany trening.');$('#setdlg').close();render();}catch(e){toast(e.message,6000);b.disabled=false;}};
 }
 
 /* ===== Czat zawodnik ↔ trener + powiadomienia o zmianach w planie ===== */
