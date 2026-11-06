@@ -927,6 +927,12 @@ body.chat-open .fab{display:none}
 .wfree.none{background:#ECEDEF;border-left:3px solid #868E96}.wfree.none .ic{color:#C92A2A}
 .avo.none{display:inline-flex;align-items:center;gap:4px}.avo.none .ic{color:#C92A2A}.avo.none.on .ic{color:#fff}
 @media (max-width:620px){.disp-grid td.dd>span.av.none{justify-content:center}}
+
+/* nawigacja dzień ‹ › w oknie dnia */
+.dlg-h.daynav{gap:6px}.dlg-h.daynav h2{flex:1;text-align:center;font-size:22px}
+.dnav{width:40px;height:40px;border:1px solid var(--line);border-radius:50%;font-size:24px;line-height:1;display:grid;place-items:center;background:var(--surface);color:var(--ink)}
+.dnav:hover{border-color:var(--accent);color:var(--accent)}
+@media (max-width:420px){.dlg-h.daynav h2{font-size:18px}.dnav{width:36px;height:36px}}
 </style>
 </head>
 <body>
@@ -2402,6 +2408,7 @@ const canEditPlan=(x)=>x.kind==='avail'?isOwner():x.kind==='race'?true:x.author=
 
 /* po dodaniu treningu / startu – zamknij okno i wróć do kalendarza planu */
 function closeDayAfter(){S.closeDay=true;}
+function shiftDay(day,n){const d=new Date(day+'T12:00');d.setDate(d.getDate()+n);return ymd(d);}
 function openDay(day){
   const d=$('#setdlg');
   // ponowne otwarcie tego samego dnia (po zapisie) – zachowaj przewinięcie okna
@@ -2410,7 +2417,7 @@ function openDay(day){
   const av=planOf('avail',day),pl=planOf('plan',day),races=planOf('race',day),acts=actsOn(day);
   const free=availMin(day);
   const sportOpts=Object.entries(PLAN_SPORTS).map(([k,[l]])=>`<option value="${k}">${l}</option>`).join('');
-  d.innerHTML=`<div class="dlg-h"><h2>${ymdLabel(day).replace(/^./,c=>c.toUpperCase())}</h2><button class="icon-btn" onclick="this.closest('dialog').close()" aria-label="Zamknij">✕</button></div>
+  d.innerHTML=`<div class="dlg-h daynav"><button class="icon-btn dnav" onclick="openDay(shiftDay('${day}',-1))" aria-label="Poprzedni dzień" title="Poprzedni dzień">‹</button><h2>${ymdLabel(day).replace(/^./,c=>c.toUpperCase())}</h2><button class="icon-btn dnav" onclick="openDay(shiftDay('${day}',1))" aria-label="Następny dzień" title="Następny dzień">›</button><button class="icon-btn" onclick="this.closest('dialog').close()" aria-label="Zamknij">✕</button></div>
   <div class="dlg-b day-dlg">
     ${own?`    <section><h3><span style="color:var(--ok)">${icon('free',18)}</span>Wolny czas${free?` <span class="muted">(${mfmt(free)})</span>`:''}</h3>
       ${av.length?`<ul class="items">${av.map(a=>`<li><b>${avNone(a)?'Brak dyspozycji':mfmt(avDur(a))}</b>${a.from?` <span class="muted">(${a.from}–${a.to})</span>`:''}${avNote(a)?` – ${esc(avNote(a))}`:''}${own?`<button class="del" data-del="${a.id}">Usuń</button>`:''}</li>`).join('')}</ul>`:`<p class="muted">Ile masz czasu na trening tego dnia?</p>`}
@@ -2444,7 +2451,7 @@ function openDay(day){
   if(!d.open)d.showModal();
   if(keepTop){const b=d.querySelector('.dlg-b');if(b){b.scrollTop=keepTop;requestAnimationFrame(()=>b.scrollTop=keepTop);}}
   const refresh=()=>{render();openDay(day);};
-  const guard=async(fn,btn)=>{if(btn)btn.disabled=true;try{await fn();if(S.closeDay){S.closeDay=false;d.close();render();}else refresh();}catch(e){toast(e.message,6000);if(btn)btn.disabled=false;}};
+  const guard=async(fn,btn)=>{if(btn)btn.disabled=true;try{await fn();if(S.closeDay){S.closeDay=false;d.close();render();}else if(S.gotoDay){const g=S.gotoDay;S.gotoDay=null;render();openDay(g);}else refresh();}catch(e){toast(e.message,6000);if(btn)btn.disabled=false;}};
   d.querySelectorAll('#plZones .zb2').forEach(b=>b.onclick=()=>b.classList.toggle('on'));
   d.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{if(confirm('Usunąć ten wpis?'))guard(()=>planDel(b.dataset.del),b);});
   d.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>guard(async()=>{const id=b.dataset.approve;const note=d.querySelector('#apn-'+id).value.trim().slice(0,1000);
@@ -2472,7 +2479,8 @@ function openDay(day){
     if(m===0){try{await planSave('avail',{...base,dur:0,none:true,note});}
       catch(e){if(!/15 minut/.test(e.message))throw e; // starszy serwer bez „braku dyspozycji” – zapis zgodny wstecz
         await planSave('avail',{...base,dur:15,note:(NA_TAG+' '+note).trim()});}}
-    else await planSave('avail',{...base,dur:m,note:avNote({note})});toast(m?`Wolny czas: ${mfmt(m)}.`:'Zapisano: brak dyspozycji.');},b));
+    else await planSave('avail',{...base,dur:m,note:avNote({note})});
+    const nx=shiftDay(day,1);toast(`${m?`Wolny czas ${mfmt(m)}`:'Brak dyspozycji'} zapisany. Teraz: ${ymdLabel(nx)}.`,2500);S.gotoDay=nx;},b));
   const avN=$('#avNote');if(avN&&av.length===1&&av[0].dur!=null)avN.onchange=()=>guard(async()=>{const x=av[0];const it=x.none?{id:x.id,day,dur:0,none:true,note:avN.value}:avNone(x)?{id:x.id,day,dur:15,note:(NA_TAG+' '+avN.value).trim()}:{id:x.id,day,dur:x.dur,note:avN.value};await planSave('avail',it);toast('Zapisano notatkę.');});
   $('#plAdd').onclick=()=>guard(async()=>{const dur=Math.round(parseFloat($('#plDur').value));if(!isFinite(dur)||dur<5||dur>720)throw new Error('Czas treningu: od 5 do 720 minut.');
     const zones=[...d.querySelectorAll('#plZones .zb2.on')].map(b=>b.dataset.z);
