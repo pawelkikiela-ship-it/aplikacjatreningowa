@@ -2277,7 +2277,9 @@ const PRIO={A:['A','ważny','var(--hr)'],B:['B','mniej ważny','#F59F00'],C:['C'
 const hm2m=s=>{const [h,m]=String(s).split(':').map(Number);return h*60+m;};
 const mfmt=m=>{m=Math.round(m);const h=Math.floor(m/60),r=m%60;return h?(r?`${h} h ${r} min`:`${h} h`):`${r} min`;};
 const planOf=(kind,day)=>(S.plan||[]).filter(x=>x.kind===kind&&(!day||x.day===day));
-const avDur=x=>x.dur!=null?x.dur:(x.from&&x.to?hm2m(x.to)-hm2m(x.from):0); // nowe wpisy: sam czas trwania; starsze: od–do
+const NA_TAG='[BRAK DYSPOZYCJI]';const avNone=x=>!!x.none||String(x.note||'').startsWith(NA_TAG);
+const avNote=x=>String(x.note||'').replace(NA_TAG,'').trim();
+const avDur=x=>avNone(x)?0:x.dur!=null?x.dur:(x.from&&x.to?hm2m(x.to)-hm2m(x.from):0); // nowe wpisy: sam czas trwania; starsze: od–do
 const availMin=day=>planOf('avail',day).reduce((s,x)=>s+avDur(x),0);
 const shortDur=m=>m<60?m+'′':Math.floor(m/60)+'h'+(m%60?String(m%60).padStart(2,'0'):'');
 const ZN=['S1','S2','S3','S4','S5'];
@@ -2411,9 +2413,9 @@ function openDay(day){
   d.innerHTML=`<div class="dlg-h"><h2>${ymdLabel(day).replace(/^./,c=>c.toUpperCase())}</h2><button class="icon-btn" onclick="this.closest('dialog').close()" aria-label="Zamknij">✕</button></div>
   <div class="dlg-b day-dlg">
     ${own?`    <section><h3><span style="color:var(--ok)">${icon('free',18)}</span>Wolny czas${free?` <span class="muted">(${mfmt(free)})</span>`:''}</h3>
-      ${av.length?`<ul class="items">${av.map(a=>`<li><b>${a.none?'Brak dyspozycji':mfmt(avDur(a))}</b>${a.from?` <span class="muted">(${a.from}–${a.to})</span>`:''}${a.note?` – ${esc(a.note)}`:''}${own?`<button class="del" data-del="${a.id}">Usuń</button>`:''}</li>`).join('')}</ul>`:`<p class="muted">Ile masz czasu na trening tego dnia?</p>`}
-      <div class="avopts" role="group" aria-label="Wolny czas">${AV_OPTS.map(m=>`<button type="button" class="avo${free===m&&av.length===1?' on':''}" data-m="${m}">${m<60?m+' min':nf(m/60,m%60?1:0)+' h'}</button>`).join('')}<button type="button" class="avo none${av.some(x=>x.none)?' on':''}" data-m="0">${icon('noavail',15)} Brak dyspozycji</button></div>
-      <div class="frow"><label class="grow">Notatka (opcjonalnie)<input id="avNote" maxlength="200" placeholder="np. tylko basen" value="${esc(av.length===1?av[0].note||'':'')}"></label></div>
+      ${av.length?`<ul class="items">${av.map(a=>`<li><b>${avNone(a)?'Brak dyspozycji':mfmt(avDur(a))}</b>${a.from?` <span class="muted">(${a.from}–${a.to})</span>`:''}${avNote(a)?` – ${esc(avNote(a))}`:''}${own?`<button class="del" data-del="${a.id}">Usuń</button>`:''}</li>`).join('')}</ul>`:`<p class="muted">Ile masz czasu na trening tego dnia?</p>`}
+      <div class="avopts" role="group" aria-label="Wolny czas">${AV_OPTS.map(m=>`<button type="button" class="avo${free===m&&av.length===1?' on':''}" data-m="${m}">${m<60?m+' min':nf(m/60,m%60?1:0)+' h'}</button>`).join('')}<button type="button" class="avo none${av.some(avNone)?' on':''}" data-m="0">${icon('noavail',15)} Brak dyspozycji</button></div>
+      <div class="frow"><label class="grow">Notatka (opcjonalnie)<input id="avNote" maxlength="200" placeholder="np. tylko basen" value="${esc(av.length===1?avNote(av[0]):'')}"></label></div>
     </section>
 `:''}
     <section><h3><span style="color:var(--accent)">${icon('run',18)}</span>Plan treningu</h3>
@@ -2466,8 +2468,12 @@ function openDay(day){
   // wybór czasu zastępuje dotychczasowy wpis z tego dnia
   d.querySelectorAll('.avo').forEach(b=>b.onclick=()=>guard(async()=>{const m=+b.dataset.m;const note=$('#avNote').value;
     const keep=av[0];for(const x of av.slice(1))await planDel(x.id);
-    await planSave('avail',{...(keep?{id:keep.id}:{}),day,dur:m,none:m===0,note});toast(m?`Wolny czas: ${mfmt(m)}.`:'Zapisano: brak dyspozycji.');},b));
-  const avN=$('#avNote');if(avN&&av.length===1&&av[0].dur!=null)avN.onchange=()=>guard(async()=>{await planSave('avail',{id:av[0].id,day,dur:av[0].dur,note:avN.value});toast('Zapisano notatkę.');});
+    const base={...(keep?{id:keep.id}:{}),day};
+    if(m===0){try{await planSave('avail',{...base,dur:0,none:true,note});}
+      catch(e){if(!/15 minut/.test(e.message))throw e; // starszy serwer bez „braku dyspozycji” – zapis zgodny wstecz
+        await planSave('avail',{...base,dur:15,note:(NA_TAG+' '+note).trim()});}}
+    else await planSave('avail',{...base,dur:m,note:avNote({note})});toast(m?`Wolny czas: ${mfmt(m)}.`:'Zapisano: brak dyspozycji.');},b));
+  const avN=$('#avNote');if(avN&&av.length===1&&av[0].dur!=null)avN.onchange=()=>guard(async()=>{const x=av[0];const it=x.none?{id:x.id,day,dur:0,none:true,note:avN.value}:avNone(x)?{id:x.id,day,dur:15,note:(NA_TAG+' '+avN.value).trim()}:{id:x.id,day,dur:x.dur,note:avN.value};await planSave('avail',it);toast('Zapisano notatkę.');});
   $('#plAdd').onclick=()=>guard(async()=>{const dur=Math.round(parseFloat($('#plDur').value));if(!isFinite(dur)||dur<5||dur>720)throw new Error('Czas treningu: od 5 do 720 minut.');
     const zones=[...d.querySelectorAll('#plZones .zb2.on')].map(b=>b.dataset.z);
     await planSave('plan',{day,sport:$('#plSport').value,dur,desc:$('#plDesc').value,zones});toast('Dodano trening do planu.');closeDayAfter();},$('#plAdd'));
@@ -2501,8 +2507,8 @@ function renderDispWeek(monKey){
       <header><b>${d.toLocaleDateString('pl-PL',{weekday:'long'})}</b><span>${d.toLocaleDateString('pl-PL',{day:'numeric',month:'long'})}</span>
         ${pl.length||free?`<span class="dsum"><b>${pl.length}</b> ${plural(pl.length,'trening','treningi','treningów')}${pl.length?` (${mfmt(pl.reduce((x,p)=>x+p.dur,0))})`:''}, wolne <b>${free?mfmt(free):'–'}</b></span>`:''}</header>
       ${races.map(r=>`<div class="wrace" style="--pc:${PRIO[r.prio][2]}">${icon('race',16)}<div><b><span class="prio" style="background:${PRIO[r.prio][2]}">${r.prio}</span> ${esc(r.name)}</b><span>${RACE_DISC[r.disc]}${r.dist?', '+esc(r.dist):''}${r.goal?`, cel ${esc(r.goal)}`:''}</span></div></div>`).join('')}
-      ${isNoAvail(k)?`<div class="wfree none">${icon('noavail',18)}<div><b>Brak dyspozycji</b>${av.filter(a=>a.note).map(a=>`<span>${esc(a.note)}</span>`).join('')}</div></div>`:''}
-      ${free?`<div class="wfree">${icon('free',16)}<div><b>Wolny czas: ${(m=>m<60?m+' min':nf(m/60,m%60?1:0)+' h')(free)}</b>${av.filter(a=>a.note).map(a=>`<span>${esc(a.note)}</span>`).join('')}</div></div>`:''}
+      ${isNoAvail(k)?`<div class="wfree none">${icon('noavail',18)}<div><b>Brak dyspozycji</b>${av.filter(a=>avNote(a)).map(a=>`<span>${esc(avNote(a))}</span>`).join('')}</div></div>`:''}
+      ${free?`<div class="wfree">${icon('free',16)}<div><b>Wolny czas: ${(m=>m<60?m+' min':nf(m/60,m%60?1:0)+' h')(free)}</b>${av.filter(a=>avNote(a)).map(a=>`<span>${esc(avNote(a))}</span>`).join('')}</div></div>`:''}
       ${pl.map(p=>`<div class="wplan ${p.author==='coach'?'bycoach':'byath'}${planDone(p)?' done':''}${p.skip?' skip':''}${p.change?' chg':''}" style="--c:${PLAN_SPORTS[p.sport][1]}">
         <div class="wph">${icon(p.sport,18)}<b>${PLAN_SPORTS[p.sport][0]}</b><span class="wdur">${mfmt(p.dur)}</span>${p.zones&&p.zones.length?`<span class="zchip">${zonesTxt(p.zones)}</span>`:''}${p.ai?'<span class="aitag">Claude</span>':''}</div>
         ${statusBox(p,true)}${byAthlete(p)?`<div>${approveBadge(p,true)}</div>`:''}
@@ -2774,7 +2780,7 @@ function openImport(){
 
 /* ===== Ręczne dodanie wykonanego treningu (bez zegarka) ===== */
 const planReal=k=>planOf('plan',k).filter(p=>!p.logged); // plan bez treningów dopisanych ręcznie
-const isNoAvail=k=>planOf('avail',k).some(x=>x.none);
+const isNoAvail=k=>planOf('avail',k).some(avNone);
 function logFormHtml(day){
   return `<section class="logsec">
     <button type="button" class="bigtoggle log-t" data-tog="logBox" aria-expanded="false">${icon('done',20)}<span>Dodaj wykonany trening<small>np. spacer, sauna, siłownia bez zegarka</small></span><i class="chev">▾</i></button>
