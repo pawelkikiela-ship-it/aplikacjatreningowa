@@ -936,6 +936,9 @@ body.chat-open .fab{display:none}
 
 .perfbox{margin:0 20px 8px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);font-size:13px}
 .perfrow{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:4px}
+
+.moreweeks{display:flex;justify-content:center;margin:8px 0 24px}.moreweeks .btn{min-height:46px}
+.chmore{align-self:center;font-size:13px}
 </style>
 </head>
 <body>
@@ -1612,6 +1615,7 @@ function renderTop(){
 function weekStart(ms){const d=new Date(ms);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d.getTime();}
 function commentCounts(){const m={};const seen=S.state?.seen||{};
   for(const c of S.comments){const x=m[c.activityId]||(m[c.activityId]={n:0,u:0});x.n++;if(c.role!==S.me.role&&c.ts>(seen[c.activityId]||0)&&!S.local)x.u++;}return m;}
+const LIST_WEEKS=6; // na start ostatnie 6 tygodni – starsze po kliknięciu (szybsze otwieranie na telefonie)
 function renderList(){
   const main=$('#main');const acts0=[...S.acts.values()];const all=acts0.concat(manualDone()).sort((a,b)=>b.start-a.start);
   if(!all.length){
@@ -1642,7 +1646,7 @@ function renderList(){
     ${aiPanel()}
     <section>
       <div class="sec-h"><h2 style="font-size:28px">Treningi</h2><div class="filters">${cats.map(([k,l])=>`<button class="chip" aria-pressed="${S.filter===k}" data-f="${k}">${l}</button>`).join('')}</div></div>
-      ${[...weeks.entries()].map(([k,arr])=>{
+      ${[...weeks.entries()].slice(0,S.listWeeks||LIST_WEEKS).map(([k,arr])=>{
         const end=new Date(k+6*864e5);
         return `<div class="week"><div class="week-h"><h3>${new Date(k).toLocaleDateString('pl-PL',{day:'numeric',month:'short'})} – ${end.toLocaleDateString('pl-PL',{day:'numeric',month:'short',year:'numeric'})}</h3>
         <div class="tot"><span>${km(sum(arr,a=>a.s.d),1)} km</span><span>${dur(sum(arr,a=>a.s.mt),true)}</span><span>${nf(sum(arr,a=>a.s.gain))} m</span><span>obciążenie ${nf(sum(arr,a=>loadOf(a)?.v))}</span></div></div>
@@ -1654,8 +1658,10 @@ function renderList(){
           <div class="m">${a.s.d>50?`<div><b class="num">${km(a.s.d)}</b><span>km</span></div>`:''}<div><b class="num">${dur(a.s.mt||a.s.et)}</b><span>czas</span></div>
           ${a.s.d>50?`<div><b class="num">${isRun(a)?pace(a.s.spd):nf(a.s.spd*3.6,1)}</b><span>${isRun(a)?'/km':'km/h'}</span></div>`:''}
           ${a.s.hr?`<div><b class="num">${nf(a.s.hr)}</b><span>bpm</span></div>`:''}${L?`<div><b class="num">${nf(L.v)}</b><span>obc.</span></div>`:''}</div></a>${actEffortRow(a)}</li>`;}).join('')}</ul></div>`;}).join('')}
+      ${weeks.size>(S.listWeeks||LIST_WEEKS)?`<div class="moreweeks"><button class="btn" id="moreWeeks">Pokaż starsze treningi <span class="muted">(jeszcze ${weeks.size-(S.listWeeks||LIST_WEEKS)} ${plural(weeks.size-(S.listWeeks||LIST_WEEKS),'tydzień','tygodnie','tygodni')})</span></button></div>`:''}
     </section></div>`;
-  main.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{S.filter=b.dataset.f;render();});bindRestPanel();bindAiPanel();bindActEffort(main);
+  main.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{S.filter=b.dataset.f;S.listWeeks=LIST_WEEKS;render();});bindRestPanel();
+  const mw=$('#moreWeeks');if(mw)mw.onclick=()=>{const n=S.listWeeks||LIST_WEEKS;const top=mw.getBoundingClientRect().top;S.listWeeks=n+8;render();const w=document.querySelectorAll('#main .week')[n];if(w)window.scrollBy(0,w.getBoundingClientRect().top-top);};bindAiPanel();bindActEffort(main);
   main.querySelectorAll('[data-manday]').forEach(el=>el.onclick=e=>{e.preventDefault();const d=el.dataset.manday;DISP_MEM.v='week';go('#/dyspozycja/t/'+ymd(mondayOf(new Date(d+'T12:00'))));openDay(d);});
   bindRestChart(main,new Date().getFullYear(),new Date().getMonth()+1);
   S.redraw=()=>{drawWeeks(all.filter(a=>!a.manual).concat(all.filter(a=>a.manual)));drawRestChart(new Date().getFullYear(),new Date().getMonth()+1);};S.redraw();
@@ -2841,7 +2847,8 @@ function closeChat(){S.chatOpen=false;$('#chatdrw').hidden=true;document.body.cl
 function renderChat(keepInput){
   const d=$('#chatdrw');if(!d||d.hidden)return;const f=S.chatFilter||'all';
   const prev=keepInput?($('#chatTxt')?.value||''):'';
-  const list=(S.chat||[]).filter(m=>f==='all'||(f==='msg'?m.type==='msg':m.type==='event'));
+  const full=(S.chat||[]).filter(m=>f==='all'||(f==='msg'?m.type==='msg':m.type==='event'));
+  const lim=S.chatLimit||60;const list=full.slice(-lim);const older=full.length-list.length;
   const who=r=>r===S.me.role?'Ty':esc(S.names[r]||(r==='coach'?'Trener':'Zawodnik'));
   let lastDay='';
   const rows=list.map(m=>{const day=new Date(m.ts).toLocaleDateString('pl-PL',{weekday:'long',day:'numeric',month:'long'});
@@ -2853,10 +2860,11 @@ function renderChat(keepInput){
       ${(S.chat||[]).length?`<button class="btn ghost chclr" id="chClr" aria-haspopup="true">Wyczyść</button>`:''}</div>
     <div class="chclrbox" id="chClrBox" hidden><span>Wyczyścić komunikaty w <b>Twoim</b> widoku? ${S.me.role==='coach'?'Zawodnik':'Trener'} nadal będzie je widział.</span>
       <div class="pact"><button class="btn" data-clr="events">Tylko zmiany w planie</button><button class="btn danger-btn" data-clr="all">Wszystkie komunikaty</button><button class="btn ghost" id="chClrNo">Anuluj</button></div></div>
-    <div class="ch-list" id="chList">${rows||`<p class="muted ch-empty">${f==='event'?'Brak zmian w planie.':'Brak wiadomości. Napisz pierwszą.'}</p>`}</div>
+    <div class="ch-list" id="chList">${older?`<button class="btn ghost chmore" id="chMore">Pokaż starsze (${older})</button>`:''}${rows||`<p class="muted ch-empty">${f==='event'?'Brak zmian w planie.':'Brak wiadomości. Napisz pierwszą.'}</p>`}</div>
     <div class="ch-in"><textarea id="chatTxt" rows="2" maxlength="2000" placeholder="Napisz wiadomość…"></textarea><button class="btn primary" id="chatSend" aria-label="Wyślij">Wyślij</button></div>`;
   const ta=$('#chatTxt');ta.value=prev;
-  d.querySelectorAll('[data-cf]').forEach(b=>b.onclick=()=>{S.chatFilter=b.dataset.cf;renderChat(true);});
+  d.querySelectorAll('[data-cf]').forEach(b=>b.onclick=()=>{S.chatFilter=b.dataset.cf;S.chatLimit=60;renderChat(true);});
+  const cm=$('#chMore');if(cm)cm.onclick=()=>{const l=$('#chList');const h0=l.scrollHeight;S.chatLimit=(S.chatLimit||60)+100;renderChat(true);const l2=$('#chList');l2.scrollTop=l2.scrollHeight-h0;};
   const cl=$('#chClr');if(cl)cl.onclick=()=>{$('#chClrBox').hidden=false;cl.hidden=true;};
   const cn=$('#chClrNo');if(cn)cn.onclick=()=>{$('#chClrBox').hidden=true;const c=$('#chClr');if(c)c.hidden=false;};
   d.querySelectorAll('[data-clr]').forEach(b=>b.onclick=async()=>{const what=b.dataset.clr;const old=S.chat;const now=Date.now();
