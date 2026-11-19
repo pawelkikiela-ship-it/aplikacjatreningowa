@@ -933,6 +933,9 @@ body.chat-open .fab{display:none}
 .dnav{width:40px;height:40px;border:1px solid var(--line);border-radius:50%;font-size:24px;line-height:1;display:grid;place-items:center;background:var(--surface);color:var(--ink)}
 .dnav:hover{border-color:var(--accent);color:var(--accent)}
 @media (max-width:420px){.dlg-h.daynav h2{font-size:18px}.dnav{width:36px;height:36px}}
+
+.perfbox{margin:0 20px 8px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);font-size:13px}
+.perfrow{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:4px}
 </style>
 </head>
 <body>
@@ -1386,6 +1389,7 @@ const HAS_API=HAS_GAS||!!API_URL;
 // operacje bezpieczne do powtórzenia (nie tworzą duplikatów)
 const RETRY_OK=new Set(['init','sync','streams','chatClear','chatSeen','seen','claudeDocs','fit','updateActivity','planDone','setRest','rate','planApprove','saveSettings']);
 async function apiFetch(action,payload,attempt=0){
+  const t0=performance.now();
   // zwykłe żądanie POST (text/plain – bez zapytania wstępnego CORS) do aplikacji Apps Script
   let r;
   try{r=await fetch(API_URL,{method:'POST',redirect:'follow',cache:'no-store',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({k:S.key,action,payload:payload||{}})});}
@@ -1397,12 +1401,22 @@ async function apiFetch(action,payload,attempt=0){
   try{o=JSON.parse(t);}catch(e){
     if(attempt<2&&RETRY_OK.has(action)){await new Promise(z=>setTimeout(z,800*(attempt+1)));return apiFetch(action,payload,attempt+1);}
     throw new Error('Błędna odpowiedź serwera'+(r.status&&r.status!==200?' ('+r.status+')':''));}
-  if(o.error)throw new Error(o.error);return o.data;
+  if(o.error)throw new Error(o.error);apiMeta(o,action,t0);return o.data;
 }
+/* pomiar szybkości i rozpoznawanie własnych zmian */
+S.perf=[];
+function apiMeta(o,action,t0){
+  const tot=Math.round(performance.now()-t0);S.perf.push({a:action,tot,srv:o.ms||0,at:Date.now()});if(S.perf.length>40)S.perf.shift();
+  // zmiana zrobiona przeze mnie, a nikt inny nic nie zmienił – przyjmij nowy znacznik bez pobierania wszystkiego od nowa
+  if(o.st&&S.stamp&&o.st[0]===S.stamp){S.stamp=o.st[1];S.chatDirty=true;}
+}
+function perfSummary(){const p=S.perf.filter(x=>x.a!=='sync'||x.srv>0);if(!p.length)return null;
+  const avg=f=>Math.round(p.reduce((s,x)=>s+f(x),0)/p.length);return{n:p.length,tot:avg(x=>x.tot),srv:avg(x=>x.srv),net:avg(x=>Math.max(0,x.tot-x.srv)),max:Math.max(...p.map(x=>x.tot))};}
 function api(action,payload){
   if(!HAS_GAS&&API_URL)return apiFetch(action,payload);
   return new Promise((res,rej)=>{
-    google.script.run.withSuccessHandler(r=>{let o;try{o=JSON.parse(r);}catch(e){return rej(new Error('Błędna odpowiedź serwera'));}o.error?rej(new Error(o.error)):res(o.data);})
+    const t0=performance.now();
+    google.script.run.withSuccessHandler(r=>{let o;try{o=JSON.parse(r);}catch(e){return rej(new Error('Błędna odpowiedź serwera'));}if(o.error)return rej(new Error(o.error));apiMeta(o,action,t0);res(o.data);})
       .withFailureHandler(e=>rej(e instanceof Error?e:new Error(String(e&&e.message||e)))).api(S.key,action,JSON.stringify(payload||{}));
   });
 }
@@ -1441,10 +1455,10 @@ function applyInit(d){
 async function sync(){
   if(S.syncing||!S.ready||S.local)return;S.syncing=true;
   try{
-    const d=await api('sync');
-    if(d.chat)setChat(d.chat,d.chatSeen,true);
+    const d=await api('sync',{stamp:S.stamp,wantChat:!!S.chatDirty});
+    if(d.same)return;
+    if(d.chat){S.chatDirty=false;setChat(d.chat,d.chatSeen,true);}
     if(d.stamp!==S.stamp){const fresh=await api('init');cacheSave(fresh);applyInitSoft(fresh);}
-    else if(JSON.stringify(d.comments)!==JSON.stringify(S.comments)){S.comments=d.comments;softRender();}
   }catch(e){console.warn(e);}finally{S.syncing=false;}
 }
 /* ===== Zapis w tle (zmiana widoczna od razu, serwer potwierdza później) ===== */
@@ -3036,6 +3050,10 @@ function openSettings(){
   ${own&&S.coachLink?`<div class="help"><b>Link dla trenera.</b> Wyślij go trenerowi — po otwarciu zobaczy wszystkie treningi i będzie mógł dodawać uwagi, ale nie wgra ani nie usunie aktywności. Link zawiera kod dostępu, więc nie udostępniaj go nikomu innemu.
     <div style="display:flex;gap:8px;margin-top:8px"><input readonly id="coachLink" value="${esc(S.coachLink)}" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;padding:6px 9px;background:var(--surface);color:var(--ink)"><button class="btn" id="copyLink">Kopiuj</button></div></div>`:''}
   </div>
+  ${(()=>{const p=perfSummary();if(!p)return'';const sec=v=>(v/1000).toFixed(1).replace('.',',')+' s';
+    return `<div class="perfbox"><b>Szybkość połączenia</b> <span class="muted">(ostatnie ${p.n} ${plural(p.n,'operacja','operacje','operacji')})</span>
+      <div class="perfrow"><span>średnio <b>${sec(p.tot)}</b></span><span>praca serwera <b>${sec(p.srv)}</b></span><span>sieć i Google <b>${sec(p.net)}</b></span><span>najdłużej <b>${sec(p.max)}</b></span></div>
+      <p class="muted" style="margin:4px 0 0">${p.net>p.srv*3?'Większość czasu zajmuje połączenie z Google (uruchomienie skryptu, sieć) – to nie zależy od ilości danych.':'Większość czasu zajmuje praca serwera.'}</p></div>`;})()}
   <div class="dlg-f">${own||!S.local?`<button class="btn ghost" id="s_logout" style="margin-right:auto">Wyloguj</button>`:''}<button class="btn" onclick="this.closest('dialog').close()">${own?'Anuluj':'Zamknij'}</button>${own?'<button class="btn primary" id="s_save">Zapisz ustawienia</button>':''}</div>`;
   d.showModal();bindZoneEditor(d);
   const cp=$('#copyLink');if(cp)cp.onclick=()=>{const i=$('#coachLink');i.select();try{navigator.clipboard.writeText(i.value).then(()=>toast('Skopiowano link.'),()=>{document.execCommand('copy');toast('Skopiowano link.');});}catch(e){document.execCommand('copy');toast('Skopiowano link.');}};
