@@ -940,6 +940,13 @@ body.chat-open .fab{display:none}
 .moreweeks{display:flex;justify-content:center;margin:8px 0 24px}.moreweeks .btn{min-height:46px}
 .chmore{align-self:center;font-size:13px}
 .iculine{font-size:13px;border-radius:6px;padding:6px 10px}.iculine.on{background:var(--ok-soft);color:var(--ok)}.iculine.off{background:var(--surface-2);color:var(--muted)}
+
+/* „Ten tydzień”: czas i kalorie na wierzchu, reszta po „Pokaż więcej” */
+.week-now.wk2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.week-now.wk2 b{font-size:34px}
+.wkmore{margin-top:8px;font-size:14px;color:var(--accent);padding:6px 0;min-height:36px;border:0}
+.wkdet{border-top:1px solid var(--line);margin-top:6px;padding-top:10px}
+.week-now.wk2 b{white-space:nowrap}@media (max-width:620px){.week-now.wk2 b{font-size:27px}}@media (max-width:360px){.week-now.wk2 b{font-size:23px}}
 </style>
 </head>
 <body>
@@ -1616,7 +1623,7 @@ function renderTop(){
 function weekStart(ms){const d=new Date(ms);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d.getTime();}
 function commentCounts(){const m={};const seen=S.state?.seen||{};
   for(const c of S.comments){const x=m[c.activityId]||(m[c.activityId]={n:0,u:0});x.n++;if(c.role!==S.me.role&&c.ts>(seen[c.activityId]||0)&&!S.local)x.u++;}return m;}
-const LIST_WEEKS=6; // na start ostatnie 6 tygodni – starsze po kliknięciu (szybsze otwieranie na telefonie)
+const LIST_ITEMS=10; // na start 10 ostatnich treningów – kolejne po kliknięciu „Pokaż dalej”
 function renderList(){
   const main=$('#main');const acts0=[...S.acts.values()];const all=acts0.concat(manualDone()).sort((a,b)=>b.start-a.start);
   if(!all.length){
@@ -1637,21 +1644,28 @@ function renderList(){
     ${restPanel(true)}
     <div class="overview">
       <section class="panel"><h2>Ten tydzień</h2><p class="sub">od ${new Date(wk).toLocaleDateString('pl-PL',{day:'numeric',month:'long'})}</p>
-        <div class="week-now">
-          <div><b class="num">${km(sum(thisW,a=>a.s.d),1)}</b><span>km</span></div>
-          <div><b class="num">${dur(sum(thisW,a=>a.s.mt),true)}</b><span>czas ruchu</span></div>
-          <div><b class="num">${nf(sum(thisW,a=>a.s.gain))}</b><span>m w górę</span></div>
-          <div><b class="num">${nf(sum(thisW,a=>loadOf(a)?.v))}</b><span>obciążenie</span></div>
-        </div><canvas class="cv" id="wb"></canvas><p class="sub" style="margin:6px 0 0">Czas ruchu w ostatnich 12 tygodniach</p></section>
+        <div class="week-now wk2">
+          <div><b class="num">${dur(sum(thisW,a=>a.s.mt||a.s.et),true)}</b><span>czas treningów</span></div>
+          <div><b class="num">${nf(sum(thisW,a=>a.s.cal||0))}</b><span>kcal</span></div>
+        </div>
+        <canvas class="cv" id="wd"></canvas><p class="sub" style="margin:4px 0 0">Czas treningów w kolejnych dniach tygodnia</p>
+        <button class="btn ghost wkmore" id="wkMore" aria-expanded="${!!S.wkMore}">${S.wkMore?'Pokaż mniej ▴':'Pokaż więcej ▾'}</button>
+        <div class="wkdet" id="wkDet" ${S.wkMore?'':'hidden'}>
+          <div class="week-now">
+            <div><b class="num">${thisW.length}</b><span>${plural(thisW.length,'trening','treningi','treningów')}</span></div>
+            <div><b class="num">${km(sum(thisW,a=>a.s.d),1)}</b><span>km</span></div>
+            <div><b class="num">${nf(sum(thisW,a=>a.s.gain))}</b><span>m w górę</span></div>
+            <div><b class="num">${nf(sum(thisW,a=>loadOf(a)?.v))}</b><span>obciążenie</span></div>
+          </div><canvas class="cv" id="wb"></canvas><p class="sub" style="margin:6px 0 0">Czas treningów w ostatnich 12 tygodniach</p></div></section>
     </div>
     ${aiPanel()}
     <section>
       <div class="sec-h"><h2 style="font-size:28px">Treningi</h2><div class="filters">${cats.map(([k,l])=>`<button class="chip" aria-pressed="${S.filter===k}" data-f="${k}">${l}</button>`).join('')}</div></div>
-      ${[...weeks.entries()].slice(0,S.listWeeks||LIST_WEEKS).map(([k,arr])=>{
+      ${(()=>{let left=S.listItems||LIST_ITEMS;const out=[];for(const [k,arr] of weeks){if(left<=0)break;out.push([k,arr,arr.slice(0,left)]);left-=Math.min(left,arr.length);}return out;})().map(([k,arr,part])=>{
         const end=new Date(k+6*864e5);
         return `<div class="week"><div class="week-h"><h3>${new Date(k).toLocaleDateString('pl-PL',{day:'numeric',month:'short'})} – ${end.toLocaleDateString('pl-PL',{day:'numeric',month:'short',year:'numeric'})}</h3>
         <div class="tot"><span>${km(sum(arr,a=>a.s.d),1)} km</span><span>${dur(sum(arr,a=>a.s.mt),true)}</span><span>${nf(sum(arr,a=>a.s.gain))} m</span><span>obciążenie ${nf(sum(arr,a=>loadOf(a)?.v))}</span></div></div>
-        <ul class="acts">${arr.map(a=>{if(a.manual)return manualRow(a);const c=cc[a.id];const st=S.local?'':analyzedAt(a)?' st-done':' st-todo';const L=loadOf(a);const d=new Date(a.start);
+        <ul class="acts">${part.map(a=>{if(a.manual)return manualRow(a);const c=cc[a.id];const st=S.local?'':analyzedAt(a)?' st-done':' st-todo';const L=loadOf(a);const d=new Date(a.start);
           return `<li class="actli"><a class="act${st}" href="#/a/${encodeURIComponent(a.id)}">
           <div class="day"><b>${d.getDate()}</b><span>${d.toLocaleDateString('pl-PL',{weekday:'short'})}</span></div>
           <div class="t"><b>${esc(a.name)}${S.local?'':statusBadge(a)+rateBadge(a)}${c?`<span class="badge ${c.u?'new':'cmc'}">${c.u?c.u+' '+plural(c.u,'nowa uwaga','nowe uwagi','nowych uwag'):c.n+' '+plural(c.n,'uwaga','uwagi','uwag')}</span>`:''}</b>
@@ -1659,13 +1673,14 @@ function renderList(){
           <div class="m">${a.s.d>50?`<div><b class="num">${km(a.s.d)}</b><span>km</span></div>`:''}<div><b class="num">${dur(a.s.mt||a.s.et)}</b><span>czas</span></div>
           ${a.s.d>50?`<div><b class="num">${isRun(a)?pace(a.s.spd):nf(a.s.spd*3.6,1)}</b><span>${isRun(a)?'/km':'km/h'}</span></div>`:''}
           ${a.s.hr?`<div><b class="num">${nf(a.s.hr)}</b><span>bpm</span></div>`:''}${L?`<div><b class="num">${nf(L.v)}</b><span>obc.</span></div>`:''}</div></a>${actEffortRow(a)}</li>`;}).join('')}</ul></div>`;}).join('')}
-      ${weeks.size>(S.listWeeks||LIST_WEEKS)?`<div class="moreweeks"><button class="btn" id="moreWeeks">Pokaż starsze treningi <span class="muted">(jeszcze ${weeks.size-(S.listWeeks||LIST_WEEKS)} ${plural(weeks.size-(S.listWeeks||LIST_WEEKS),'tydzień','tygodnie','tygodni')})</span></button></div>`:''}
+      ${list.length>(S.listItems||LIST_ITEMS)?`<div class="moreweeks"><button class="btn" id="moreWeeks">Pokaż dalej <span class="muted">(jeszcze ${list.length-(S.listItems||LIST_ITEMS)} ${plural(list.length-(S.listItems||LIST_ITEMS),'trening','treningi','treningów')})</span></button></div>`:''}
     </section></div>`;
-  main.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{S.filter=b.dataset.f;S.listWeeks=LIST_WEEKS;render();});bindRestPanel();
-  const mw=$('#moreWeeks');if(mw)mw.onclick=()=>{const n=S.listWeeks||LIST_WEEKS;const top=mw.getBoundingClientRect().top;S.listWeeks=n+8;render();const w=document.querySelectorAll('#main .week')[n];if(w)window.scrollBy(0,w.getBoundingClientRect().top-top);};bindAiPanel();bindActEffort(main);
+  main.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{S.filter=b.dataset.f;S.listItems=LIST_ITEMS;render();});bindRestPanel();
+  const mw=$('#moreWeeks');if(mw)mw.onclick=()=>{const n=S.listItems||LIST_ITEMS;const top=mw.getBoundingClientRect().top;S.listItems=n+10;render();const li=document.querySelectorAll('#main .acts>li')[n];if(li)window.scrollBy(0,li.getBoundingClientRect().top-top);};
+  const wm=$('#wkMore');if(wm)wm.onclick=()=>{S.wkMore=!S.wkMore;const det=$('#wkDet');det.hidden=!S.wkMore;wm.setAttribute('aria-expanded',S.wkMore);wm.textContent=S.wkMore?'Pokaż mniej ▴':'Pokaż więcej ▾';if(S.wkMore)drawWeeks(all);};bindAiPanel();bindActEffort(main);
   main.querySelectorAll('[data-manday]').forEach(el=>el.onclick=e=>{e.preventDefault();const d=el.dataset.manday;DISP_MEM.v='week';go('#/dyspozycja/t/'+ymd(mondayOf(new Date(d+'T12:00'))));openDay(d);});
   bindRestChart(main,new Date().getFullYear(),new Date().getMonth()+1);
-  S.redraw=()=>{drawWeeks(all.filter(a=>!a.manual).concat(all.filter(a=>a.manual)));drawRestChart(new Date().getFullYear(),new Date().getMonth()+1);};S.redraw();
+  S.redraw=()=>{drawWeekDays(all);if(S.wkMore)drawWeeks(all);drawRestChart(new Date().getFullYear(),new Date().getMonth()+1);};S.redraw();
 }
 function manualRow(a){const d=new Date(a.start);const p=a.p;const ch=p.change;
   return `<li class="actli man"><a class="act st-done" href="#/dyspozycja" data-manday="${a.day}">
@@ -1708,10 +1723,23 @@ function drawFF(all){
   for(const [k,col] of [['ctl','--accent'],['atl','--hr']]){g.strokeStyle=css(col);g.lineWidth=2;g.beginPath();show.forEach((p,i)=>i?g.lineTo(X(i),Y(p[k])):g.moveTo(X(i),Y(p[k])));g.stroke();}
   g.fillStyle=css('--muted');for(let i=0;i<show.length;i+=30){const d=new Date(show[i].t);g.fillText(d.toLocaleDateString('pl-PL',{day:'numeric',month:'short'}),X(i)-10,h-3);}
 }
+function drawWeekDays(all){
+  const c=$('#wd');if(!c)return;const {g,w,h}=fitCanvas(c,130);
+  const wk=weekStart(Date.now());const today=Math.floor((Date.now()-wk)/864e5);
+  const vals=[0,0,0,0,0,0,0];all.forEach(a=>{const i=Math.floor((a.start-wk)/864e5);if(i>=0&&i<7)vals[i]+=(a.s.mt||a.s.et||0)/60;});
+  const max=Math.max(30,...vals);const bw=(w-8)/7;const lbl=['pn','wt','śr','cz','pt','sb','nd'];
+  g.font='11px Inter';g.textAlign='center';
+  vals.forEach((v,i)=>{const bh=(h-34)*v/max;const x=4+i*bw;g.fillStyle=i===today?css('--accent'):i<today?css('--spd'):css('--line');
+    if(bh>0){g.beginPath();g.roundRect?g.roundRect(x+6,h-18-bh,bw-12,bh,4):g.rect(x+6,h-18-bh,bw-12,bh);g.fill();}
+    else{g.fillStyle=css('--line');g.fillRect(x+6,h-19,bw-12,1);}
+    if(v>0){g.fillStyle=css('--ink');g.fillText(v<60?Math.round(v)+'′':(Math.floor(v/60)+'h'+(Math.round(v%60)?String(Math.round(v%60)).padStart(2,'0'):'')),x+bw/2,h-22-bh);}
+    g.fillStyle=i===today?css('--accent'):css('--muted');g.fillText(lbl[i],x+bw/2,h-4);});
+  g.textAlign='left';
+}
 function drawWeeks(all){
   const c=$('#wb');if(!c)return;const {g,w,h}=fitCanvas(c,120);
   const wk=weekStart(Date.now());const ws=[];for(let i=11;i>=0;i--)ws.push(wk-i*7*864e5);
-  const vals=ws.map(k=>all.filter(a=>weekStart(a.start)===k).reduce((x,a)=>x+(a.s.mt||0),0)/3600);
+  const vals=ws.map(k=>all.filter(a=>weekStart(a.start)===k).reduce((x,a)=>x+(a.s.mt||a.s.et||0),0)/3600);
   const max=Math.max(1,...vals);const bw=(w-8)/12;
   g.font='11px Inter';
   vals.forEach((v,i)=>{const bh=(h-30)*v/max;g.fillStyle=i===11?css('--accent'):css('--line');g.beginPath();g.roundRect?g.roundRect(4+i*bw+3,h-16-bh,bw-6,bh,3):g.rect(4+i*bw+3,h-16-bh,bw-6,bh);g.fill();
