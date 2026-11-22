@@ -2797,9 +2797,8 @@ function openImport(){
   const ii=S.importInfo||{};const l=ii.last;const d=$('#setdlg');
   d.innerHTML=`<div class="dlg-h"><h2>Import treningów</h2><button class="icon-btn" onclick="this.closest('dialog').close()" aria-label="Zamknij">✕</button></div>
   <div class="dlg-b"><div class="impinfo"><span class="impst ${ii.auto?'on':'off'}">${ii.auto?'Automatyczny import włączony':'Automatyczny import wyłączony'}</span>
-    <p>${ii.auto?(ii.hourly?'Co godzinę':'Codziennie ok. 21:00')+' aplikacja sprawdza folder na Dysku'+(ii.icu?', Suunto':'')+(ii.igp?', iGPSPORT':'')+' i dodaje nowe treningi.':'Aby włączyć automatyczny import, uruchom w Apps Script funkcję wlaczImportCoGodzine.'}</p>
-    <p class="iculine ${ii.icu?'on':'off'}">${ii.icu?'✓ <b>Suunto</b> (przez intervals.icu) – treningi trafiają tu same.':'Suunto: niepołączone (opis w INSTRUKCJI – intervals.icu).'}</p>
-    <p class="iculine ${ii.igp?'on':'off'}">${ii.igp?'✓ <b>iGPSPORT</b> – jazdy z licznika trafiają tu same.':'iGPSPORT: niepołączone (opis w INSTRUKCJI).'}</p>
+    <p>${ii.auto?(ii.hourly?'Co godzinę':'Codziennie ok. 21:00')+' aplikacja sprawdza '+(ii.icu?'intervals.icu i folder na Dysku':'folder na Dysku')+' i dodaje nowe treningi.':'Aby włączyć automatyczny import, uruchom w Apps Script funkcję wlaczImportCoGodzine.'}</p>
+    <p class="iculine ${ii.icu?'on':'off'}">${ii.icu?'✓ <b>intervals.icu</b> – treningi z zegarka Suunto i licznika iGPSPORT trafiają tu same.':'intervals.icu: niepołączone (opis w INSTRUKCJI).'}</p>
     ${l?`<p class="muted">Ostatni import: ${ago(l.at)} – dodano ${l.ok}${l.dup?`, duplikaty ${l.dup}`:''}${l.err?`, błędy ${l.err}`:''}.</p>`:''}</div>
     <div class="pact"><button class="btn primary" id="impNowDlg">Importuj teraz</button><a class="btn" href="${esc(ii.folder||'#')}" target="_blank" rel="noopener">Otwórz folder importu</a><button class="btn" onclick="this.closest('dialog').close();pickFiles()">Wgraj pliki .fit z urządzenia</button></div></div>`;
   d.showModal();
