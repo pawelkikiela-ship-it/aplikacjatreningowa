@@ -968,6 +968,7 @@ body.ra-open{overflow:hidden}
 .ra-keys button:active{background:var(--accent);color:#fff}
 .ra-keys .ra-skip{font-size:16px;font-weight:600;color:var(--muted)}
 @media (max-height:620px){.ra-keys button{height:52px;font-size:24px}.ra-val span{font-size:56px}}
+.grid2>.sec .sec-h .seg{margin-left:auto}.grid2>.sec .sec-h{flex-wrap:wrap;gap:6px}
 </style>
 </head>
 <body>
@@ -2977,19 +2978,23 @@ function powerRides(y,m){const all=[...S.acts.values()].filter(a=>!a.manual&&isR
   if(S.pwRange==='all')return all.sort((a,b)=>a.start-b.start);
   const st=new Date(y,m-1,1).getTime(),en=new Date(y,m,1).getTime();return all.filter(a=>a.start>=st&&a.start<en).sort((a,b)=>a.start-b.start);}
 function powerSection(y,m){
-  const r=powerRides(y,m);const ridesM=[...S.acts.values()].filter(a=>!a.manual&&isRideKind(a));
+  const r=powerRides(y,m);if(!r.length&&S.pwRange!=='all')return'';
+  const seg=`<div class="seg"><button data-pr="month" aria-pressed="${S.pwRange!=='all'}">W miesiącu</button><button data-pr="all" aria-pressed="${S.pwRange==='all'}">Pełen okres</button></div>`;
+  if(!r.length)return `<section class="sec"><div class="sec-h"><h2>Moc – rower</h2>${seg}</div><div class="panel"><p class="muted" style="margin:0">Brak jazd z pomiarem mocy.</p></div></section>`;
   const best20=Math.max(0,...r.map(a=>(a.best&&a.best.pw&&a.best.pw[1200])||0));
-  const avg=r.length?r.reduce((x,a)=>x+a.s.pw,0)/r.length:0;const npMax=Math.max(0,...r.map(a=>a.s.np||0));
-  return `<section class="sec"><div class="sec-h"><h2>Moc – rower</h2>
-    <div class="seg"><button data-pr="month" aria-pressed="${S.pwRange!=='all'}">W miesiącu</button><button data-pr="all" aria-pressed="${S.pwRange==='all'}">Pełen okres</button></div></div>
-    ${r.length?`<div class="cal-stats pwstats"><div><b class="num" style="color:var(--pw)">${nf(avg)}</b><span>śr. moc jazd (W)</span></div>
-      ${npMax?`<div><b class="num">${nf(npMax)}</b><span>najwyższa moc znormalizowana (W)</span></div>`:''}
-      ${best20?`<div><b class="num">${nf(best20)}</b><span>najlepsze 20 min (W)</span></div>`:''}
-      ${best20&&S.settings&&S.settings.ftp?`<div><b class="num">${nf(best20*0.95)}</b><span>szac. FTP z 20 min (W) · w ustawieniach ${nf(S.settings.ftp)}</span></div>`:''}
-      <div><b class="num">${r.length}</b><span>${plural(r.length,'jazda','jazdy','jazd')} z pomiarem mocy</span></div></div>
-      <div class="panel" style="padding:12px"><canvas class="cv" id="pwcv"></canvas><p class="sub" style="margin:4px 0 0">Słupki – średnia moc jazdy, kropki – moc znormalizowana (NP). Kliknij słupek, aby otworzyć jazdę.</p></div>`
-    :`<div class="panel"><p class="muted" style="margin:0">${ridesM.length?'Jazdy '+(S.pwRange==='all'?'':'z tego miesiąca ')+'nie mają zapisu mocy. Wykres pojawi się, gdy licznik lub zegarek zapisze moc z pomiaru mocy (pedały, korba) albo z trenażera z pomiarem mocy.':'Brak jazd rowerowych'+(S.pwRange==='all'?'.':' w tym miesiącu.')}</p></div>`}
-  </section>`;
+  const avg=r.reduce((x,a)=>x+a.s.pw,0)/r.length;const npMax=Math.max(0,...r.map(a=>a.s.np||0));
+  const zw=zonesFor('ride','pw');const withH=r.filter(a=>a.pwHist);
+  const pwZ=withH.length?withH.reduce((x,a)=>sumArr(x,histZoneTimes({o:0,s:a.pwHist.s},a.pwHist.w,zw)),zw.map(()=>0)):zw.map(()=>0);
+  const det=`<button class="btn ghost wkmore" data-more="pw" aria-expanded="${!!S.pwMore}">${S.pwMore?'Pokaż mniej ▴':'Pokaż więcej ▾'}</button>
+    <div class="moredet" data-det="pw" ${S.pwMore?'':'hidden'}>
+      <div class="cal-stats pwstats"><div><b class="num" style="color:var(--pw)">${nf(avg)}</b><span>śr. moc jazd (W)</span></div>
+        ${npMax?`<div><b class="num">${nf(npMax)}</b><span>najwyższa NP (W)</span></div>`:''}
+        ${best20?`<div><b class="num">${nf(best20)}</b><span>najlepsze 20 min (W)</span></div>`:''}
+        ${best20&&S.settings&&S.settings.ftp?`<div><b class="num">${nf(best20*0.95)}</b><span>szac. FTP (W), w ustawieniach ${nf(S.settings.ftp)}</span></div>`:''}
+        <div><b class="num">${r.length}</b><span>${plural(r.length,'jazda','jazdy','jazd')} z mocą</span></div></div>
+      <div class="panel" style="padding:12px"><canvas class="cv" id="pwcv"></canvas><p class="sub" style="margin:4px 0 0">Słupki – średnia moc, kropki – NP. Kliknij słupek, aby otworzyć jazdę.</p></div>
+    </div>`;
+  return zoneBlockFor('ride','pw',pwZ,'Moc – rower'+(S.pwRange==='all'?' (pełen okres)':'')).replace('</div><div class="panel">',seg+'</div><div class="panel">').replace(/<\/section>$/,det+'</section>');
 }
 function drawPower(y,m){
   const c=$('#pwcv');if(!c)return;const r=powerRides(y,m);const {g,w,h}=fitCanvas(c,180);if(!r.length)return;
@@ -2998,7 +3003,7 @@ function drawPower(y,m){
   for(const v of [0,0.5,1]){const yy=T+(1-v)*(h-T-B);g.beginPath();g.moveTo(L,yy);g.lineTo(w-4,yy);g.stroke();g.textAlign='right';g.fillText(nf(max*v),L-4,yy+4);}
   c._bars=[];
   r.forEach((a,i)=>{const x=L+i*bw,bh=(h-T-B)*a.s.pw/max;g.fillStyle=css('--pw');const pad=Math.min(6,bw*0.2);
-    g.fillRect(x+pad,h-B-bh,Math.max(2,bw-2*pad),bh);c._bars.push([x,x+bw,a.id]);
+    const bwid=Math.max(2,Math.min(36,bw-2*pad));g.fillRect(x+(bw-bwid)/2,h-B-bh,bwid,bh);c._bars.push([x,x+bw,a.id]);
     if(a.s.np){g.fillStyle=css('--ink');g.beginPath();g.arc(x+bw/2,T+(1-a.s.np/max)*(h-T-B),Math.min(4,bw/3+1),0,7);g.fill();}});
   g.fillStyle=css('--muted');g.textAlign='center';const step=Math.max(1,Math.ceil(r.length/8));
   r.forEach((a,i)=>{if(i%step===0)g.fillText(new Date(a.start).toLocaleDateString('pl-PL',{day:'numeric',month:'numeric'}),L+i*bw+bw/2,h-4);});g.textAlign='left';
@@ -3131,28 +3136,26 @@ function renderCalendar(ym){
     </section>
     </section>
     ${ratingSummary(acts,all.filter(a=>a.start>=new Date(y,m-2,1).getTime()&&a.start<start.getTime()))}
-    ${powerSection(y,m)}
     ${acts.length?`<section class="sec"><div class="sec-h"><h2>Rodzaje treningów</h2></div><div class="tbl-wrap"><table><thead><tr><th>Rodzaj</th><th>Liczba</th><th>Czas</th><th>Dystans</th><th>Śr. tempo / prędkość</th><th>W górę</th><th>Tętno śr.</th><th>Kalorie</th><th>Obciążenie</th></tr></thead><tbody>
       ${Object.entries(byCat).map(([k,arr])=>{const d=sum(arr,a=>a.s.d),t=sum(arr,a=>a.s.mt);const ht=arr.filter(a=>a.s.hr).reduce((x,a)=>x+a.s.mt,0);const h=ht?arr.filter(a=>a.s.hr).reduce((x,a)=>x+a.s.hr*a.s.mt,0)/ht:null;
         return `<tr><td><span class="dot" style="background:${CATS[k][1]}"></span>${CATS[k][0]}</td><td>${arr.length}</td><td>${dur(t,true)}</td><td>${km(d,1)} km</td><td>${d>50&&t?(k==='run'?pace(d/t)+' /km':nf(d/t*3.6,1)+' km/h'):'–'}</td><td>${nf(sum(arr,a=>a.s.gain))} m</td><td>${h?nf(h)+' bpm':'–'}</td><td>${nf(sum(arr,a=>a.s.cal))}</td><td>${nf(sum(arr,a=>loadOf(a)?.v))}</td></tr>`;}).join('')}
       </tbody></table></div></section>
     <div class="grid2">
       ${hrRun.length?zoneTable2('run','hr',hrRunT,nonRun?'Tętno – bieg i pozostałe':'Tętno – bieg'):''}
-      ${hrRide.length?zoneTable2('ride','hr',hrRideT,'Tętno – rower'):''}
       ${paceZ?zoneTable2('run','pace',paceZ,'Tempo – bieg'):''}
-      ${pwZ?zoneTable2('ride','pw',pwZ,'Moc – rower'):''}
-    </div>
-    ${runs.length&&runs.some(a=>!a.paceHist)?'<p class="note">Strefy tempa obejmują tylko biegi wgrane po dodaniu tej funkcji.</p>':''}`
+      ${hrRide.length?zoneTable2('ride','hr',hrRideT,'Tętno – rower'):''}
+      ${powerSection(y,m)}
+    </div>`
     :`<div class="empty" style="margin-top:20px"><h2>Brak treningów w tym miesiącu</h2><p>Wybierz inny miesiąc strzałkami lub z wykresu powyżej.</p></div>`}
     ${yearSection(y)}
     <section class="sec"><div class="sec-h"><h2>Cały okres</h2><span class="muted">czas ruchu w kolejnych miesiącach – kliknij, aby przejść</span></div>
     <div class="months allm">${monthsAll.map(x=>`<a href="#/kalendarz/${x.y}-${x.m}" class="mb${x.y===y&&x.m===m?' on':''}" title="${x.n} ${plural(x.n,'trening','treningi','treningów')}, ${nf(x.km,0)} km, ${dur(x.t*3600,true)}"><b>${x.n||''}</b><i style="height:${Math.max(2,x.t/mxAll*54)}px"></i><span>${MONTHS[x.m-1].slice(0,3)}${x.m===1||x===monthsAll[0]?' '+String(x.y).slice(2):''}</span></a>`).join('')}</div></section>
   </div>`;
   main.querySelectorAll('button.rhr').forEach(b=>b.onclick=e=>{e.preventDefault();editRest(b.dataset.day);});
-  main.querySelectorAll('[data-more]').forEach(b=>b.onclick=()=>{const k=b.dataset.more;S[k+'More']=!S[k+'More'];const det=main.querySelector(`[data-det="${k}"]`);det.hidden=!S[k+'More'];b.setAttribute('aria-expanded',S[k+'More']);b.textContent=S[k+'More']?'Pokaż mniej ▴':'Pokaż więcej ▾';});
+  main.querySelectorAll('[data-more]').forEach(b=>b.onclick=()=>{const k=b.dataset.more;S[k+'More']=!S[k+'More'];const det=main.querySelector(`[data-det="${k}"]`);det.hidden=!S[k+'More'];b.setAttribute('aria-expanded',S[k+'More']);b.textContent=S[k+'More']?'Pokaż mniej ▴':'Pokaż więcej ▾';if(k==='pw'&&S.pwMore)drawPower(y,m);});
   main.querySelectorAll('[data-pr]').forEach(b=>b.onclick=()=>{S.pwRange=b.dataset.pr;render();});
   main.querySelectorAll('[data-manday]').forEach(el=>el.onclick=e=>{e.preventDefault();e.stopPropagation();const d=el.dataset.manday;DISP_MEM.v='week';go('#/dyspozycja/t/'+ymd(mondayOf(new Date(d+'T12:00'))));openDay(d);});
-  S.redraw=()=>drawPower(y,m);S.redraw();
+  S.redraw=()=>{if(S.pwMore)drawPower(y,m);};S.redraw();
 }
 
 function importBar(){
