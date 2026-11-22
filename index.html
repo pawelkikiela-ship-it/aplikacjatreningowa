@@ -947,6 +947,27 @@ body.chat-open .fab{display:none}
 .wkmore{margin-top:8px;font-size:14px;color:var(--accent);padding:6px 0;min-height:36px;border:0}
 .wkdet{border-top:1px solid var(--line);margin-top:6px;padding-top:10px}
 .week-now.wk2 b{white-space:nowrap}@media (max-width:620px){.week-now.wk2 b{font-size:27px}}@media (max-width:360px){.week-now.wk2 b{font-size:23px}}
+
+/* oceny: średnia + najlepsze, reszta po „Pokaż więcej” */
+.rsum.rsum1{grid-template-columns:1fr}.rsum.rsum2{margin-top:10px}
+.rbest{margin-top:12px}.rbest h3{font-size:16px;margin:0 0 6px}.rbest ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.moredet{border-top:1px solid var(--line);margin-top:6px;padding-top:6px}
+.pwstats{margin-bottom:10px}
+.tbl.yr td,.tbl.yr th{padding:8px 10px}.tbl .r{text-align:right}
+/* codzienne tętno spoczynkowe – pełny ekran */
+body.ra-open{overflow:hidden}
+.restask{position:fixed;inset:0;z-index:100;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(4px);display:grid;place-items:center;padding:16px;padding-top:max(16px,env(safe-area-inset-top))}
+.ra-box{width:min(420px,100%);background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.25);padding:20px 18px;display:grid;gap:10px;text-align:center}
+.ra-h{font-size:24px;font-weight:700}.ra-sub{font-size:14px;color:var(--muted)}
+.ra-val{display:flex;align-items:baseline;justify-content:center;gap:8px;margin:4px 0}
+.ra-val span{font-size:72px;font-weight:700;color:var(--hr);font-variant-numeric:tabular-nums;letter-spacing:4px;line-height:1}
+.ra-val small{font-size:18px;color:var(--muted)}
+.ra-err{min-height:18px;font-size:14px;color:var(--danger)}
+.ra-keys{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.ra-keys button{height:64px;border-radius:14px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);font:inherit;font-size:28px;font-weight:600;cursor:pointer;touch-action:manipulation}
+.ra-keys button:active{background:var(--accent);color:#fff}
+.ra-keys .ra-skip{font-size:16px;font-weight:600;color:var(--muted)}
+@media (max-height:620px){.ra-keys button{height:52px;font-size:24px}.ra-val span{font-size:56px}}
 </style>
 </head>
 <body>
@@ -1453,7 +1474,8 @@ async function boot(){
     if(cached){toast('Brak połączenia – pokazuję ostatnio zapisane dane.',6000);}
     else{$('#main').innerHTML=`<div class="wrap loading">Nie udało się połączyć z danymi: ${esc(e.message)}</div>`;return;}}
   setInterval(()=>{if(document.visibilityState==='visible')sync();},45000);
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')sync();});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){sync();maybeAskRest();}});
+  setTimeout(maybeAskRest,300);
 }
 function applyInit(d){
   S.me={role:d.role,isOwner:d.role==='athlete',name:d.names[d.role]};
@@ -2239,6 +2261,27 @@ async function saveRest(day,bpm){
   bgApi('setRest',{date:day,bpm},()=>{if(old==null)delete S.rest[day];else S.rest[day]=old;});
   return true;
 }
+/* Pierwsze otwarcie aplikacji danego dnia: duży ekran z klawiaturą do wpisania tętna spoczynkowego */
+function maybeAskRest(){
+  if(!S.ready||S.local||!isOwner())return;const day=ymd(Date.now());
+  if(S.rest&&S.rest[day]!=null)return;
+  try{if(localStorage.getItem('dt_restask')===day)return;}catch(e){}
+  if(document.getElementById('restask'))return;
+  let v='';const el=document.createElement('div');el.id='restask';el.className='restask';el.setAttribute('role','dialog');el.setAttribute('aria-modal','true');el.setAttribute('aria-label','Tętno spoczynkowe');
+  el.innerHTML=`<div class="ra-box"><div class="ra-h"><span class="heart">♥</span> Tętno spoczynkowe</div><div class="ra-sub">${ymdLabel(day).replace(/^./,c=>c.toUpperCase())} – zmierzone rano, przed wstaniem</div>
+    <div class="ra-val" aria-live="polite"><span id="raV">––</span><small>bpm</small></div><div class="ra-err" id="raE"></div>
+    <div class="ra-keys">${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-k="${n}">${n}</button>`).join('')}<button data-k="skip" class="ra-skip">Pomiń</button><button data-k="0">0</button><button data-k="del" aria-label="Usuń cyfrę">⌫</button></div></div>`;
+  document.body.appendChild(el);document.body.classList.add('ra-open');
+  const show=()=>{$('#raV').textContent=(v+'––').slice(0,2);};
+  const close=()=>{el.remove();document.body.classList.remove('ra-open');try{localStorage.setItem('dt_restask',day);}catch(e){}};
+  el.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const k=b.dataset.k;$('#raE').textContent='';
+    if(k==='skip'){close();return;}if(k==='del'){v=v.slice(0,-1);show();return;}
+    if(v.length>=2)return;v+=k;show();
+    if(v.length===2){const n=+v;if(n<25){$('#raE').textContent='Za niska wartość – wpisz jeszcze raz.';v='';setTimeout(show,500);return;}
+      setTimeout(()=>{close();saveRest(day,n);if(route().view==='list'||route().view==='cal')render();},250);}});
+  document.addEventListener('keydown',function kd(e){if(!document.getElementById('restask')){document.removeEventListener('keydown',kd);return;}
+    if(/^[0-9]$/.test(e.key))el.querySelector(`[data-k="${e.key}"]`).click();else if(e.key==='Backspace')el.querySelector('[data-k="del"]').click();else if(e.key==='Escape')el.querySelector('[data-k="skip"]').click();});
+}
 function parseBpm(v){v=String(v||'').trim();if(!v)return null;const n=Math.round(parseFloat(v.replace(',','.')));if(!isFinite(n)||n<25||n>130)throw new Error('Podaj tętno w zakresie 25–130 bpm.');return n;}
 async function editRest(day){
   if(!isOwner())return;
@@ -2928,6 +2971,55 @@ function bindRating(a){
     catch(e){toast('Nie zapisano oceny: '+e.message);}
   });
 }
+/* ===== Moc – rower (jazdy z zapisem mocy) ===== */
+const isRideKind=a=>{const k=kindOf(a);return k==='ride'||k==='trainer';};
+function powerRides(y,m){const all=[...S.acts.values()].filter(a=>!a.manual&&isRideKind(a)&&a.s&&a.s.pw>0);
+  if(S.pwRange==='all')return all.sort((a,b)=>a.start-b.start);
+  const st=new Date(y,m-1,1).getTime(),en=new Date(y,m,1).getTime();return all.filter(a=>a.start>=st&&a.start<en).sort((a,b)=>a.start-b.start);}
+function powerSection(y,m){
+  const r=powerRides(y,m);const ridesM=[...S.acts.values()].filter(a=>!a.manual&&isRideKind(a));
+  const best20=Math.max(0,...r.map(a=>(a.best&&a.best.pw&&a.best.pw[1200])||0));
+  const avg=r.length?r.reduce((x,a)=>x+a.s.pw,0)/r.length:0;const npMax=Math.max(0,...r.map(a=>a.s.np||0));
+  return `<section class="sec"><div class="sec-h"><h2>Moc – rower</h2>
+    <div class="seg"><button data-pr="month" aria-pressed="${S.pwRange!=='all'}">W miesiącu</button><button data-pr="all" aria-pressed="${S.pwRange==='all'}">Pełen okres</button></div></div>
+    ${r.length?`<div class="cal-stats pwstats"><div><b class="num" style="color:var(--pw)">${nf(avg)}</b><span>śr. moc jazd (W)</span></div>
+      ${npMax?`<div><b class="num">${nf(npMax)}</b><span>najwyższa moc znormalizowana (W)</span></div>`:''}
+      ${best20?`<div><b class="num">${nf(best20)}</b><span>najlepsze 20 min (W)</span></div>`:''}
+      ${best20&&S.settings&&S.settings.ftp?`<div><b class="num">${nf(best20*0.95)}</b><span>szac. FTP z 20 min (W) · w ustawieniach ${nf(S.settings.ftp)}</span></div>`:''}
+      <div><b class="num">${r.length}</b><span>${plural(r.length,'jazda','jazdy','jazd')} z pomiarem mocy</span></div></div>
+      <div class="panel" style="padding:12px"><canvas class="cv" id="pwcv"></canvas><p class="sub" style="margin:4px 0 0">Słupki – średnia moc jazdy, kropki – moc znormalizowana (NP). Kliknij słupek, aby otworzyć jazdę.</p></div>`
+    :`<div class="panel"><p class="muted" style="margin:0">${ridesM.length?'Jazdy '+(S.pwRange==='all'?'':'z tego miesiąca ')+'nie mają zapisu mocy. Wykres pojawi się, gdy licznik lub zegarek zapisze moc z pomiaru mocy (pedały, korba) albo z trenażera z pomiarem mocy.':'Brak jazd rowerowych'+(S.pwRange==='all'?'.':' w tym miesiącu.')}</p></div>`}
+  </section>`;
+}
+function drawPower(y,m){
+  const c=$('#pwcv');if(!c)return;const r=powerRides(y,m);const {g,w,h}=fitCanvas(c,180);if(!r.length)return;
+  const max=Math.max(...r.map(a=>Math.max(a.s.pw,a.s.np||0)))*1.1;const L=36,B=20,T=8,bw=(w-L-6)/r.length;
+  g.font='11px Inter';g.strokeStyle=css('--line');g.fillStyle=css('--muted');
+  for(const v of [0,0.5,1]){const yy=T+(1-v)*(h-T-B);g.beginPath();g.moveTo(L,yy);g.lineTo(w-4,yy);g.stroke();g.textAlign='right';g.fillText(nf(max*v),L-4,yy+4);}
+  c._bars=[];
+  r.forEach((a,i)=>{const x=L+i*bw,bh=(h-T-B)*a.s.pw/max;g.fillStyle=css('--pw');const pad=Math.min(6,bw*0.2);
+    g.fillRect(x+pad,h-B-bh,Math.max(2,bw-2*pad),bh);c._bars.push([x,x+bw,a.id]);
+    if(a.s.np){g.fillStyle=css('--ink');g.beginPath();g.arc(x+bw/2,T+(1-a.s.np/max)*(h-T-B),Math.min(4,bw/3+1),0,7);g.fill();}});
+  g.fillStyle=css('--muted');g.textAlign='center';const step=Math.max(1,Math.ceil(r.length/8));
+  r.forEach((a,i)=>{if(i%step===0)g.fillText(new Date(a.start).toLocaleDateString('pl-PL',{day:'numeric',month:'numeric'}),L+i*bw+bw/2,h-4);});g.textAlign='left';
+  c.onclick=e=>{const rc=c.getBoundingClientRect();const x=e.clientX-rc.left;const hit=(c._bars||[]).find(b=>x>=b[0]&&x<b[1]);if(hit)go('#/a/'+encodeURIComponent(hit[2]));};
+  c.style.cursor='pointer';
+}
+
+/* ===== Podsumowanie roczne ===== */
+function yearSection(y){
+  const st=new Date(y,0,1).getTime(),en=new Date(y+1,0,1).getTime();
+  const arr=[...S.acts.values()].concat(manualDone()).filter(a=>a.start>=st&&a.start<en);
+  const tot=arr.reduce((x,a)=>x+(a.s.mt||a.s.et||0),0);const by={};arr.forEach(a=>{const k=kindOf(a);(by[k]||(by[k]={n:0,t:0})).n++;by[k].t+=(a.s.mt||a.s.et||0);});
+  const prev=[...S.acts.values()].concat(manualDone()).filter(a=>a.start>=new Date(y-1,0,1).getTime()&&a.start<st);
+  return `<section class="sec"><div class="sec-h"><h2>Podsumowanie roczne ${y}</h2>${prev.length?`<span class="muted">${y-1}: ${prev.length} ${plural(prev.length,'trening','treningi','treningów')}, ${dur(prev.reduce((x,a)=>x+(a.s.mt||a.s.et||0),0),true)}</span>`:''}</div>
+    <div class="cal-stats"><div><b class="num">${arr.length}</b><span>${plural(arr.length,'trening','treningi','treningów')}</span></div><div><b class="num">${dur(tot,true)}</b><span>czas treningów</span></div>
+      ${arr.length?`<div><b class="num">${dur(tot/Math.max(1,Math.ceil((Math.min(Date.now(),en)-st)/(7*864e5))),true)}</b><span>średnio na tydzień</span></div>`:''}</div>
+    ${arr.length?`<div class="tbl-wrap"><table class="tbl yr"><thead><tr><th>Rodzaj</th><th class="r">Treningi</th><th class="r">Czas</th></tr></thead><tbody>
+      ${KIND_ORDER.filter(k=>by[k]).map(k=>`<tr><td><span class="dot" style="background:${CATS[k][1]}"></span> ${CATS[k][0]}</td><td class="r num">${by[k].n}</td><td class="r num">${dur(by[k].t,true)}</td></tr>`).join('')}</tbody></table></div>`:''}
+  </section>`;
+}
+
 function ratingSummary(acts,prevActs){
   const rated=acts.filter(ratingOf);if(!acts.length)return'';
   const avg=rated.length?rated.reduce((s,a)=>s+ratingOf(a),0)/rated.length:null;
@@ -2939,14 +3031,20 @@ function ratingSummary(acts,prevActs){
   const worst=[...rated].sort((x,y)=>ratingOf(x)-ratingOf(y)||y.start-x.start).filter(a=>ratingOf(a)<=2).slice(0,3);
   const li=a=>`<li><a href="#/a/${encodeURIComponent(a.id)}">${esc(a.name)}</a> <span class="muted">${new Date(a.start).toLocaleDateString('pl-PL',{day:'numeric',month:'short'})}</span> ${rateBadge(a)}</li>`;
   return `<section class="sec"><div class="sec-h"><h2>Ocena treningów w miesiącu</h2><span class="muted">oceny trenera w skali 1–5</span></div>
-  ${rated.length?`<div class="rsum">
+  ${rated.length?`<div class="rsum rsum1">
     <div class="rbig"><b class="num" style="color:${RATE[Math.round(avg)][1]}">${nf(avg,1)}</b><span>średnia ocena</span><strong>${verdict}</strong>
       <span class="muted">ocenione ${rated.length} z ${acts.length} ${plural(acts.length,'treningu','treningów','treningów')}</span>
       ${pavg!=null?`<span class="${avg>=pavg?'up':'down'}">${avg>pavg?'▲':avg<pavg?'▼':'='} ${avg===pavg?'tak samo jak':(avg>pavg?'lepiej niż':'gorzej niż')} w poprzednim miesiącu (${nf(pavg,1)})</span>`:''}</div>
+  </div>
+  ${best.length?`<div class="rbest"><h3>Najlepiej ocenione</h3><ul>${best.map(li).join('')}</ul></div>`:''}
+  <button class="btn ghost wkmore" data-more="rate" aria-expanded="${!!S.rateMore}">${S.rateMore?'Pokaż mniej ▴':'Pokaż więcej ▾'}</button>
+  <div class="moredet" data-det="rate" ${S.rateMore?'':'hidden'}>
+    <div class="rsum rsum2">
     <div class="rdist">${[5,4,3,2,1].map(n=>`<div class="rrow"><span>${n} – ${RATE[n][0]}</span><div class="zb"><i style="width:${dist[n-1]/mx*100}%;background:${RATE[n][1]}"></i></div><b>${dist[n-1]}</b></div>`).join('')}</div>
     <div class="rcat">${Object.entries(byCat).map(([k,v])=>`<div><span><span class="dot" style="background:${CATS[k][1]}"></span>${CATS[k][0]}</span><b>${nf(v.reduce((x,y)=>x+y,0)/v.length,1)}</b><span class="muted">${v.length} ${plural(v.length,'ocena','oceny','ocen')}</span></div>`).join('')}</div>
-  </div>
-  ${best.length||worst.length?`<div class="grid2 rlists">${best.length?`<div><h3>Najlepiej ocenione</h3><ul>${best.map(li).join('')}</ul></div>`:'<div></div>'}${worst.length?`<div><h3>Do poprawy</h3><ul>${worst.map(li).join('')}</ul></div>`:''}</div>`:''}`
+    </div>
+    ${worst.length?`<div class="rbest"><h3>Do poprawy</h3><ul>${worst.map(li).join('')}</ul></div>`:''}
+  </div>`
   :`<div class="panel"><p class="muted" style="margin:0">${S.me.role==='coach'?'Nie oceniłeś jeszcze żadnego treningu z tego miesiąca. Oceny dodasz w widoku treningu (1 – słabo, 5 – bardzo dobrze).':'Trener nie ocenił jeszcze treningów z tego miesiąca.'}</p></div>`}
   </section>`;
 }
@@ -3033,6 +3131,7 @@ function renderCalendar(ym){
     </section>
     </section>
     ${ratingSummary(acts,all.filter(a=>a.start>=new Date(y,m-2,1).getTime()&&a.start<start.getTime()))}
+    ${powerSection(y,m)}
     ${acts.length?`<section class="sec"><div class="sec-h"><h2>Rodzaje treningów</h2></div><div class="tbl-wrap"><table><thead><tr><th>Rodzaj</th><th>Liczba</th><th>Czas</th><th>Dystans</th><th>Śr. tempo / prędkość</th><th>W górę</th><th>Tętno śr.</th><th>Kalorie</th><th>Obciążenie</th></tr></thead><tbody>
       ${Object.entries(byCat).map(([k,arr])=>{const d=sum(arr,a=>a.s.d),t=sum(arr,a=>a.s.mt);const ht=arr.filter(a=>a.s.hr).reduce((x,a)=>x+a.s.mt,0);const h=ht?arr.filter(a=>a.s.hr).reduce((x,a)=>x+a.s.hr*a.s.mt,0)/ht:null;
         return `<tr><td><span class="dot" style="background:${CATS[k][1]}"></span>${CATS[k][0]}</td><td>${arr.length}</td><td>${dur(t,true)}</td><td>${km(d,1)} km</td><td>${d>50&&t?(k==='run'?pace(d/t)+' /km':nf(d/t*3.6,1)+' km/h'):'–'}</td><td>${nf(sum(arr,a=>a.s.gain))} m</td><td>${h?nf(h)+' bpm':'–'}</td><td>${nf(sum(arr,a=>a.s.cal))}</td><td>${nf(sum(arr,a=>loadOf(a)?.v))}</td></tr>`;}).join('')}
@@ -3045,12 +3144,15 @@ function renderCalendar(ym){
     </div>
     ${runs.length&&runs.some(a=>!a.paceHist)?'<p class="note">Strefy tempa obejmują tylko biegi wgrane po dodaniu tej funkcji.</p>':''}`
     :`<div class="empty" style="margin-top:20px"><h2>Brak treningów w tym miesiącu</h2><p>Wybierz inny miesiąc strzałkami lub z wykresu powyżej.</p></div>`}
+    ${yearSection(y)}
     <section class="sec"><div class="sec-h"><h2>Cały okres</h2><span class="muted">czas ruchu w kolejnych miesiącach – kliknij, aby przejść</span></div>
     <div class="months allm">${monthsAll.map(x=>`<a href="#/kalendarz/${x.y}-${x.m}" class="mb${x.y===y&&x.m===m?' on':''}" title="${x.n} ${plural(x.n,'trening','treningi','treningów')}, ${nf(x.km,0)} km, ${dur(x.t*3600,true)}"><b>${x.n||''}</b><i style="height:${Math.max(2,x.t/mxAll*54)}px"></i><span>${MONTHS[x.m-1].slice(0,3)}${x.m===1||x===monthsAll[0]?' '+String(x.y).slice(2):''}</span></a>`).join('')}</div></section>
   </div>`;
   main.querySelectorAll('button.rhr').forEach(b=>b.onclick=e=>{e.preventDefault();editRest(b.dataset.day);});
+  main.querySelectorAll('[data-more]').forEach(b=>b.onclick=()=>{const k=b.dataset.more;S[k+'More']=!S[k+'More'];const det=main.querySelector(`[data-det="${k}"]`);det.hidden=!S[k+'More'];b.setAttribute('aria-expanded',S[k+'More']);b.textContent=S[k+'More']?'Pokaż mniej ▴':'Pokaż więcej ▾';});
+  main.querySelectorAll('[data-pr]').forEach(b=>b.onclick=()=>{S.pwRange=b.dataset.pr;render();});
   main.querySelectorAll('[data-manday]').forEach(el=>el.onclick=e=>{e.preventDefault();e.stopPropagation();const d=el.dataset.manday;DISP_MEM.v='week';go('#/dyspozycja/t/'+ymd(mondayOf(new Date(d+'T12:00'))));openDay(d);});
-  S.redraw=null;
+  S.redraw=()=>drawPower(y,m);S.redraw();
 }
 
 function importBar(){
