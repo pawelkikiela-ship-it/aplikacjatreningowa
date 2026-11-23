@@ -1797,7 +1797,10 @@ function renderAct(a){
   add('Spadek',s.loss!=null?nf(s.loss)+' m':null);
   // NP / IF / TSS z licznika (gdy brak własnego wyliczenia z mocy) – osobny, niebieski blok na końcu
   const dvx=a.dv||{};const devm=[];
-  if(!s.np&&dvx.np){devm.push(['NP (licznik)',nf(dvx.np)+' W']);if(dvx.ifac)devm.push(['IF (licznik)',nf(dvx.ifac,2)]);if(dvx.tss!=null)devm.push(['TSS (licznik)',nf(dvx.tss)]);}
+  if(dvx.np)devm.push(['NP (licznik)',nf(dvx.np)+' W']);
+  if(dvx.ifac)devm.push(['IF (licznik)',nf(dvx.ifac,2)]);
+  else if(dvx.tss!=null&&(dvx.timer||s.mt))devm.push(['IF (z TSS licznika)','≈ '+nf(Math.sqrt(dvx.tss*36/(dvx.timer||s.mt)),2)]);
+  if(dvx.tss!=null)devm.push(['TSS (licznik)',nf(dvx.tss)]);
 
   main.innerHTML=`<div class="wrap actv"><div class="main-col">
     <a class="back" href="#/">‹ Wszystkie treningi</a>
@@ -1913,7 +1916,6 @@ function renderDetail(a,all){
   if(d.asc!=null)cmp.push(['Przewyższenie wg urządzenia',`${nf(d.asc)} m (aplikacja: ${nf(s.gain)})`]);
   if(d.te!=null)cmp.push(['Efekt treningowy tlenowy',nf(d.te,1)]);
   if(d.ate!=null)cmp.push(['Efekt treningowy beztlenowy',nf(d.ate,1)]);
-  if(d.tss!=null)cmp.push(['TSS wg urządzenia',nf(d.tss)]);
   if(d.cal!=null)cmp.push(['Kalorie wg urządzenia',nf(d.cal)+' kcal']);
   const CHN={lat:'GPS',hr:'tętno',cad:'kadencja',pw:'moc',alt:'wysokość',spd:'prędkość',d:'dystans',tmp:'temperatura',vo:'oscylacja',gct:'kontakt z podłożem',sl:'długość kroku',vr:'wsp. pionowy',gctb:'balans kontaktu',rr:'oddech',lrb:'balans L/P'};
   cmp.push(['Zapisane kanały',(a.channels||[]).map(c=>CHN[c.k]+(c.pct<90?` (${c.pct}%)`:'')).join(', ')+((a.xfields||[]).length?', '+a.xfields.map(x=>esc(x.name)).join(', '):'')]);
