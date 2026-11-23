@@ -1322,6 +1322,8 @@ function devColor(key){let h=0;for(const c of String(key))h=(h*31+c.charCodeAt(0
 /* ===== Obciążenie i strefy ===== */
 function loadOf(a,st=S.settings){
   if(a.cat==='ride'&&a.s.np&&st.ftp&&a.s.mt){const IF=a.s.np/st.ftp;return{v:a.s.mt*a.s.np*IF/(st.ftp*3600)*100,src:'moc',IF};}
+  // licznik zapisał NP/IF/TSS tylko w podsumowaniu (bez mocy co sekundę) – użyj jego TSS
+  const dv=a.dv||{};if(a.cat==='ride'&&dv.np&&dv.tss!=null)return{v:dv.tss,src:'licznik',IF:dv.ifac||null};
   if(a.hrHist&&st.maxHr>st.restHr){
     const span=st.maxHr-st.restHr;let tr=0;
     a.hrHist.s.forEach((sec,i)=>{if(!sec)return;let r=(a.hrHist.o+i-st.restHr)/span;if(r<=0)return;r=Math.min(r,1);tr+=sec/60*r*0.64*Math.exp(1.92*r);});
@@ -1784,11 +1786,13 @@ function renderAct(a){
   add('Moc śr. / maks.',s.pw!=null?`${nf(s.pw)} / ${nf(s.pwMax)} W`:null);
   add('Moc znormalizowana',s.np?nf(s.np)+' W':null);
   if(s.np&&a.cat==='ride'&&S.settings.ftp){add('Intensywność (IF)',nf(s.np/S.settings.ftp,2));add('Zmienność (VI)',s.pw?nf(s.np/s.pw,2):null);}
+  const dvx=a.dv||{};
+  if(!s.np&&dvx.np){add('Moc znormalizowana (NP)',nf(dvx.np)+' W · licznik');if(dvx.ifac)add('Intensywność (IF)',nf(dvx.ifac,2)+' · licznik');if(dvx.tss!=null)add('TSS',nf(dvx.tss)+' · licznik');}
   add('Praca',s.kj?nf(s.kj)+' kJ':null);
   if(s.pw&&S.settings.weight)add('Moc / masa',nf(s.pw/S.settings.weight,2)+' W/kg');
   add('Kadencja śr.',s.cad?`${nf(s.cad*cadMul(a))} ${cadUnit(a)}`:null);
   add('Kalorie',s.cal?nf(s.cal)+' kcal':null);
-  add('Obciążenie',L?`${nf(L.v)} (z ${L.src==='moc'?'mocy':'tętna'})`:null);
+  add('Obciążenie',L?`${nf(L.v)} (z ${L.src==='moc'?'mocy':L.src==='licznik'?'licznika':'tętna'})`:null);
   add('Temperatura',s.tmpAvg!=null?`${nf(s.tmpAvg)} °C`+(Math.round(s.tmpMin)!==Math.round(s.tmpMax)?` (${nf(s.tmpMin)}–${nf(s.tmpMax)})`:''):null);
   add('Wysokość min. / maks.',s.altMin!=null?`${nf(s.altMin)} / ${nf(s.altMax)} m`:null);
   add('Spadek',s.loss!=null?nf(s.loss)+' m':null);
@@ -1907,6 +1911,8 @@ function renderDetail(a,all){
   if(d.asc!=null)cmp.push(['Przewyższenie wg urządzenia',`${nf(d.asc)} m (aplikacja: ${nf(s.gain)})`]);
   if(d.te!=null)cmp.push(['Efekt treningowy tlenowy',nf(d.te,1)]);
   if(d.ate!=null)cmp.push(['Efekt treningowy beztlenowy',nf(d.ate,1)]);
+  if(d.np!=null)cmp.push(['NP wg urządzenia',nf(d.np)+' W'+(s.np?` (aplikacja: ${nf(s.np)} W)`:'')]);
+  if(d.ifac!=null)cmp.push(['IF wg urządzenia',nf(d.ifac,2)+(d.ftp?` (FTP w urządzeniu: ${nf(d.ftp)} W)`:'')]);
   if(d.tss!=null)cmp.push(['TSS wg urządzenia',nf(d.tss)]);
   if(d.cal!=null)cmp.push(['Kalorie wg urządzenia',nf(d.cal)+' kcal']);
   const CHN={lat:'GPS',hr:'tętno',cad:'kadencja',pw:'moc',alt:'wysokość',spd:'prędkość',d:'dystans',tmp:'temperatura',vo:'oscylacja',gct:'kontakt z podłożem',sl:'długość kroku',vr:'wsp. pionowy',gctb:'balans kontaktu',rr:'oddech',lrb:'balans L/P'};
