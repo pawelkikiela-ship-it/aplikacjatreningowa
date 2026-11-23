@@ -148,6 +148,7 @@ a{color:var(--accent)}
 .minis div{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
 .minis div:nth-child(odd){padding-right:14px}
 .minis div:nth-child(even){padding-left:14px;border-left:1px solid var(--line)}
+.minis.devm{border-top:0}.minis.devm span,.minis.devm b{color:#1d6fd8}
 .minis b{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
 .sec{margin-top:30px}
 .sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap}
@@ -1786,8 +1787,6 @@ function renderAct(a){
   add('Moc śr. / maks.',s.pw!=null?`${nf(s.pw)} / ${nf(s.pwMax)} W`:null);
   add('Moc znormalizowana',s.np?nf(s.np)+' W':null);
   if(s.np&&a.cat==='ride'&&S.settings.ftp){add('Intensywność (IF)',nf(s.np/S.settings.ftp,2));add('Zmienność (VI)',s.pw?nf(s.np/s.pw,2):null);}
-  const dvx=a.dv||{};
-  if(!s.np&&dvx.np){add('Moc znormalizowana (NP)',nf(dvx.np)+' W · licznik');if(dvx.ifac)add('Intensywność (IF)',nf(dvx.ifac,2)+' · licznik');if(dvx.tss!=null)add('TSS',nf(dvx.tss)+' · licznik');}
   add('Praca',s.kj?nf(s.kj)+' kJ':null);
   if(s.pw&&S.settings.weight)add('Moc / masa',nf(s.pw/S.settings.weight,2)+' W/kg');
   add('Kadencja śr.',s.cad?`${nf(s.cad*cadMul(a))} ${cadUnit(a)}`:null);
@@ -1796,6 +1795,9 @@ function renderAct(a){
   add('Temperatura',s.tmpAvg!=null?`${nf(s.tmpAvg)} °C`+(Math.round(s.tmpMin)!==Math.round(s.tmpMax)?` (${nf(s.tmpMin)}–${nf(s.tmpMax)})`:''):null);
   add('Wysokość min. / maks.',s.altMin!=null?`${nf(s.altMin)} / ${nf(s.altMax)} m`:null);
   add('Spadek',s.loss!=null?nf(s.loss)+' m':null);
+  // NP / IF / TSS z licznika (gdy brak własnego wyliczenia z mocy) – osobny, niebieski blok na końcu
+  const dvx=a.dv||{};const devm=[];
+  if(!s.np&&dvx.np){devm.push(['NP (licznik)',nf(dvx.np)+' W']);if(dvx.ifac)devm.push(['IF (licznik)',nf(dvx.ifac,2)]);if(dvx.tss!=null)devm.push(['TSS (licznik)',nf(dvx.tss)]);}
 
   main.innerHTML=`<div class="wrap actv"><div class="main-col">
     <a class="back" href="#/">‹ Wszystkie treningi</a>
@@ -1812,7 +1814,7 @@ function renderAct(a){
           <div><b class="num">${dur(s.mt||s.et)}</b><span>czas ruchu</span></div>
           ${s.d>50?`<div><b class="num">${isRun(a)?pace(s.spd):nf(s.spd*3.6,1)}</b><span>${isRun(a)?'tempo /km':'km/h średnio'}</span></div>`:(s.hr?`<div><b class="num">${nf(s.hr)}</b><span>tętno śr.</span></div>`:'')}
         </div>
-        <div class="minis">${mini.map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
+        <div class="minis">${mini.map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>${devm.length?`<div class="minis devm">${devm.map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>`:''}
       </div>
     </section>
     <section class="sec chart-sec" id="chartsec"><div class="sec-h"><h2>Przebieg</h2><div class="chtools"><span id="zoomtools"></span><div class="seg" id="xmode"><button data-x="d" aria-pressed="true">Dystans</button><button data-x="t" aria-pressed="false">Czas</button></div><button class="btn" id="fsbtn" onclick="toggleFs()" title="Pełny ekran">⛶ <span class="lbl">Pełny ekran</span></button></div></div>
@@ -1911,8 +1913,6 @@ function renderDetail(a,all){
   if(d.asc!=null)cmp.push(['Przewyższenie wg urządzenia',`${nf(d.asc)} m (aplikacja: ${nf(s.gain)})`]);
   if(d.te!=null)cmp.push(['Efekt treningowy tlenowy',nf(d.te,1)]);
   if(d.ate!=null)cmp.push(['Efekt treningowy beztlenowy',nf(d.ate,1)]);
-  if(d.np!=null)cmp.push(['NP wg urządzenia',nf(d.np)+' W'+(s.np?` (aplikacja: ${nf(s.np)} W)`:'')]);
-  if(d.ifac!=null)cmp.push(['IF wg urządzenia',nf(d.ifac,2)+(d.ftp?` (FTP w urządzeniu: ${nf(d.ftp)} W)`:'')]);
   if(d.tss!=null)cmp.push(['TSS wg urządzenia',nf(d.tss)]);
   if(d.cal!=null)cmp.push(['Kalorie wg urządzenia',nf(d.cal)+' kcal']);
   const CHN={lat:'GPS',hr:'tętno',cad:'kadencja',pw:'moc',alt:'wysokość',spd:'prędkość',d:'dystans',tmp:'temperatura',vo:'oscylacja',gct:'kontakt z podłożem',sl:'długość kroku',vr:'wsp. pionowy',gctb:'balans kontaktu',rr:'oddech',lrb:'balans L/P'};
