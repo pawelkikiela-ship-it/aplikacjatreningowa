@@ -970,6 +970,7 @@ body.ra-open{overflow:hidden}
 .ra-keys .ra-skip{font-size:16px;font-weight:600;color:var(--muted)}
 @media (max-height:620px){.ra-keys button{height:52px;font-size:24px}.ra-val span{font-size:56px}}
 .grid2>.sec .sec-h .seg{margin-left:auto}.grid2>.sec .sec-h{flex-wrap:wrap;gap:6px}
+.zhint{flex-basis:100%;font-size:12px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -1785,8 +1786,8 @@ function renderAct(a){
   add('Tętno śr. / maks.',s.hr?`${nf(s.hr)} / ${nf(s.hrMax)} bpm`:null);
   add(isRun(a)?'Najszybsze tempo':'Prędkość maks.',s.spdMax&&s.d>50?spdTxt(a,s.spdMax):null);
   add('Moc śr. / maks.',s.pw!=null?`${nf(s.pw)} / ${nf(s.pwMax)} W`:null);
-  add('Moc znormalizowana',s.np?nf(s.np)+' W':null);
-  if(s.np&&a.cat==='ride'&&S.settings.ftp){add('Intensywność (IF)',nf(s.np/S.settings.ftp,2));add('Zmienność (VI)',s.pw?nf(s.np/s.pw,2):null);}
+  if(a.cat!=='ride')add('Moc znormalizowana',s.np?nf(s.np)+' W':null);
+  if(s.np&&a.cat==='ride')add('Zmienność (VI)',s.pw?nf(s.np/s.pw,2):null);
   add('Praca',s.kj?nf(s.kj)+' kJ':null);
   if(s.pw&&S.settings.weight)add('Moc / masa',nf(s.pw/S.settings.weight,2)+' W/kg');
   add('Kadencja śr.',s.cad?`${nf(s.cad*cadMul(a))} ${cadUnit(a)}`:null);
@@ -1795,12 +1796,13 @@ function renderAct(a){
   add('Temperatura',s.tmpAvg!=null?`${nf(s.tmpAvg)} °C`+(Math.round(s.tmpMin)!==Math.round(s.tmpMax)?` (${nf(s.tmpMin)}–${nf(s.tmpMax)})`:''):null);
   add('Wysokość min. / maks.',s.altMin!=null?`${nf(s.altMin)} / ${nf(s.altMax)} m`:null);
   add('Spadek',s.loss!=null?nf(s.loss)+' m':null);
-  // NP / IF / TSS z licznika (gdy brak własnego wyliczenia z mocy) – osobny, niebieski blok na końcu
+  // NP / IF / TSS dla roweru i trenażera – niebieski blok na końcu (najpierw wartości z licznika, gdy ich brak – wyliczone z mocy)
   const dvx=a.dv||{};const devm=[];
-  if(dvx.np)devm.push(['NP (licznik)',nf(dvx.np)+' W']);
-  if(dvx.ifac)devm.push(['IF (licznik)',nf(dvx.ifac,2)]);
-  else if(dvx.tss!=null&&(dvx.timer||s.mt))devm.push(['IF (z TSS licznika)','≈ '+nf(Math.sqrt(dvx.tss*36/(dvx.timer||s.mt)),2)]);
-  if(dvx.tss!=null)devm.push(['TSS (licznik)',nf(dvx.tss)]);
+  if(a.cat==='ride'){const ftp=S.settings.ftp,t=dvx.timer||s.mt;
+    const np=dvx.np||s.np||null;
+    const IF=dvx.ifac||(s.np&&ftp?s.np/ftp:null)||(dvx.tss!=null&&t?Math.sqrt(dvx.tss*36/t):null);
+    const tss=dvx.tss!=null?dvx.tss:(L&&L.src==='moc'?L.v:null);
+    if(np)devm.push(['NP',nf(np)+' W']);if(IF)devm.push(['IF',nf(IF,2)]);if(tss!=null)devm.push(['TSS',nf(tss)]);}
 
   main.innerHTML=`<div class="wrap actv"><div class="main-col">
     <a class="back" href="#/">‹ Wszystkie treningi</a>
@@ -2389,8 +2391,15 @@ const avNote=x=>String(x.note||'').replace(NA_TAG,'').trim();
 const avDur=x=>avNone(x)?0:x.dur!=null?x.dur:(x.from&&x.to?hm2m(x.to)-hm2m(x.from):0); // nowe wpisy: sam czas trwania; starsze: od–do
 const availMin=day=>planOf('avail',day).reduce((s,x)=>s+avDur(x),0);
 const shortDur=m=>m<60?m+'′':Math.floor(m/60)+'h'+(m%60?String(m%60).padStart(2,'0'):'');
-const ZN=['S1','S2','S3','S4','S5'];
-function zonesTxt(z){if(!z||!z.length)return'';const ix=z.map(x=>ZN.indexOf(x)).filter(i=>i>=0).sort((a,b)=>a-b);
+const ZN=['S1','S2','S3','S4','S5'];const ZN7=['S1','S2','S3','S4','S5','S6','S7'];
+const isBikePlan=sp=>sp==='ride'||sp==='trainer';
+// przyciski stref w planie: rower/trenażer = 7 stref mocy (wg FTP), pozostałe = 5 stref tętna
+function zoneBtnsHtml(sport,sel,cls){sel=sel||[];const bike=isBikePlan(sport);const ftp=S.settings.ftp;
+  return (bike?ZN7:ZN).map((z,i)=>{let t='';if(bike){const [,n,lo,hi]=PWZ[i];t=n+(ftp?` · ${hi>=99?'> '+Math.round(lo*ftp):Math.round(lo*ftp)+'–'+Math.round(hi*ftp)} W`:'');}
+    return `<button type="button" class="zb2${cls||''}${sel.includes(z)?' on':''}" data-z="${z}" style="--zc:${bike?ZCOL[i]:HR_COL[i]}"${t?` title="${t}"`:''}>${z}</button>`;}).join('')
+    +(bike?`<span class="zhint">strefy mocy${ftp?` · FTP ${ftp} W`:''}</span>`:'');}
+function bindZoneSport(sel,box,cls){sel.addEventListener('change',()=>{const on=[...box.querySelectorAll('.zb2.on')].map(b=>b.dataset.z);box.innerHTML=zoneBtnsHtml(sel.value,on,cls);box.querySelectorAll('.zb2').forEach(b=>b.onclick=()=>b.classList.toggle('on'));});}
+function zonesTxt(z){if(!z||!z.length)return'';const ix=z.map(x=>ZN7.indexOf(x)).filter(i=>i>=0).sort((a,b)=>a-b);const ZN=ZN7;
   const cons=ix.every((v,i)=>!i||v===ix[i-1]+1);return cons&&ix.length>1?`${ZN[ix[0]]}–${ZN[ix[ix.length-1]]}`:ix.map(i=>ZN[i]).join(', ');}
 const AV_OPTS=[30,60,90,120,150,180,240,300,360];
 /* odczucie zawodnika po treningu: 1 – lekki … 5 – zmęczony */
@@ -2534,7 +2543,7 @@ function openDay(day){
       <button type="button" class="bigtoggle plan-t" data-tog="planBox" aria-expanded="false">${icon('run',20)}<span>Zaplanuj trening<small>rodzaj, czas, strefy i opis</small></span><i class="chev">▾</i></button>
       <div class="togbox" id="planBox" hidden>
       <div class="frow"><label>Rodzaj treningu<select id="plSport">${sportOpts}</select></label><label>Czas treningu (min)<input id="plDur" inputmode="numeric" value="60"></label></div>
-      <div class="zsel"><span class="effq">Strefy <span class="muted">(opcjonalnie, można kilka)</span></span><div class="zbtns" id="plZones">${ZN.map((z,i)=>`<button type="button" class="zb2" data-z="${z}" style="--zc:${HR_COL[i]}">${z}</button>`).join('')}</div></div>
+      <div class="zsel"><span class="effq">Strefy <span class="muted">(opcjonalnie, można kilka)</span></span><div class="zbtns" id="plZones">${zoneBtnsHtml(Object.keys(PLAN_SPORTS)[0],[])}</div></div>
       <div class="frow"><label class="grow">Opis treningu<textarea id="plDesc" rows="3" maxlength="2000" placeholder="np. 10 min rozgrzewki, 6×800 m w S4, 10 min schłodzenia"></textarea></label></div>
       <div class="frow end"><button class="btn primary" id="plAdd">Zapisz trening</button></div></div>
     </section>
@@ -2554,6 +2563,7 @@ function openDay(day){
   const refresh=()=>{render();openDay(day);};
   const guard=async(fn,btn)=>{if(btn)btn.disabled=true;try{await fn();if(S.closeDay){S.closeDay=false;d.close();render();}else if(S.gotoDay){const g=S.gotoDay;S.gotoDay=null;render();openDay(g);}else refresh();}catch(e){toast(e.message,6000);if(btn)btn.disabled=false;}};
   d.querySelectorAll('#plZones .zb2').forEach(b=>b.onclick=()=>b.classList.toggle('on'));
+  {const ps=d.querySelector('#plSport'),pz=d.querySelector('#plZones');if(ps&&pz){if(isBikePlan(ps.value))ps.dispatchEvent(new Event('change'));bindZoneSport(ps,pz,'');}}
   d.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{if(confirm('Usunąć ten wpis?'))guard(()=>planDel(b.dataset.del),b);});
   d.querySelectorAll('[data-approve]').forEach(b=>b.onclick=()=>guard(async()=>{const id=b.dataset.approve;const note=d.querySelector('#apn-'+id).value.trim().slice(0,1000);
     if(!S.local)await api('planApprove',{id,approve:true,note});const x=S.plan.find(x=>x.id===id);if(x)x.approve={note,ts:Date.now()};toast('Trening zaakceptowany.');},b));
@@ -2846,7 +2856,7 @@ function planEditHtml(p){
   <div class="pedit" id="pe-${p.id}" hidden>
     <div class="frow"><label>Rodzaj<select id="pes-${p.id}">${Object.entries(PLAN_SPORTS).map(([k,[l]])=>`<option value="${k}"${k===p.sport?' selected':''}>${l}</option>`).join('')}</select></label>
       <label>Czas (min)<input id="ped-${p.id}" inputmode="numeric" value="${p.dur}"></label></div>
-    <div class="zsel"><span class="effq">Strefy</span><div class="zbtns">${ZN.map((z,i)=>`<button type="button" class="zb2 ze${(p.zones||[]).includes(z)?' on':''}" data-z="${z}" style="--zc:${HR_COL[i]}">${z}</button>`).join('')}</div></div>
+    <div class="zsel"><span class="effq">Strefy</span><div class="zbtns" id="pez-${p.id}">${zoneBtnsHtml(p.sport,p.zones,' ze')}</div></div>
     <label class="skipn">Opis treningu<textarea id="pex-${p.id}" rows="3" maxlength="2000">${esc(p.desc||'')}</textarea></label>
     ${byAthlete(p)&&p.approve?'<p class="note" style="margin:0">Po zmianie trening będzie czekał na ponowną akceptację trenera.</p>':''}
     <div class="pact"><button class="btn primary" data-pesave="${p.id}">Zapisz zmiany</button><button class="btn ghost" data-pecancel="${p.id}">Anuluj</button></div></div>
@@ -2859,6 +2869,7 @@ function bindPlanEdit(d,refresh){
   d.querySelectorAll('[data-pnote]').forEach(b=>b.onclick=()=>{show(b.dataset.pnote,'pn');d.querySelector('#pnx-'+b.dataset.pnote).focus();});
   d.querySelectorAll('[data-pecancel],[data-pncancel]').forEach(b=>b.onclick=()=>show(b.dataset.pecancel||b.dataset.pncancel,''));
   d.querySelectorAll('.ze').forEach(b=>b.onclick=()=>b.classList.toggle('on'));
+  d.querySelectorAll('[id^="pes-"]').forEach(sel=>{const bx=d.querySelector('#pez-'+sel.id.slice(4));if(bx)bindZoneSport(sel,bx,' ze');});
   d.querySelectorAll('[data-pesave]').forEach(b=>b.onclick=async()=>{const id=b.dataset.pesave;const x=S.plan.find(x=>x.id===id);if(!x)return;
     const dur=Math.round(parseFloat(d.querySelector('#ped-'+id).value));if(!(dur>=5&&dur<=720)){toast('Czas treningu: od 5 do 720 minut.');return;}
     const zones=[...d.querySelector('#pe-'+id).querySelectorAll('.ze.on')].map(z=>z.dataset.z);
